@@ -13,6 +13,7 @@ article:target > .open-roll{display:none}
 .profile-save-row{grid-column:auto;min-width:0;flex-wrap:wrap}.profile-save-row label{flex:1 1 8rem}.profile-save-row button{max-width:100%}.profile-save-row p{margin:0}
 .location-panel{margin-top:.6rem}.location-layout{display:flex;align-items:flex-start;gap:.6rem;flex-wrap:wrap}.location-layout>div{flex:1 1 13rem;min-width:0}.location-layout>button{margin:0}.location-form{padding:.6rem;margin:0 0 .5rem}.location-manager{margin-top:.75rem}.location-manager h3{margin:0 0 .5rem}
 .location-remove{padding:.65rem;margin-top:.6rem;border:1px solid #58716e;border-radius:.6rem}.location-remove button+button{margin-inline-start:.5rem}.location-manager .stock-weight-save{flex-wrap:wrap}.location-manager .stock-weight-save button{max-width:100%}
+.location-remove-button{display:block;margin-top:.55rem}.location-create-row{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr);align-items:start;gap:.55rem}.location-create-row>button{margin:0;max-width:8.5rem;white-space:normal}.location-create-row>.location-form{min-width:0;padding:0;border:0;background:transparent;margin:0}.location-create-row .stock-weight-save{display:grid;gap:.4rem}.location-create-row .stock-weight-save button{justify-self:start}
 </style>
 <main>
 <header><span class="label">Filamentlager</span><h1>Filament Bestand</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -343,12 +344,20 @@ function addLocationSection(card, readStock, saveStock) {
     for (const place of places) manager.append(locationForm(place));
     const create = element('button','Lagerort erstellen');
     create.type = 'button';
+    const createRow = element('div','');
+    createRow.className = 'location-create-row';
+    createRow.append(create);
     create.onclick = () => {
-      const editor = locationForm(null);
-      create.replaceWith(editor);
+      let editor = createRow.querySelector('form');
+      if (!editor) {
+        editor = locationForm(null);
+        createRow.append(editor);
+        create.setAttribute('aria-expanded','true');
+      }
       editor.querySelector('input').focus();
     };
-    manager.append(create);
+    create.setAttribute('aria-expanded','false');
+    manager.append(createRow);
   }
   function affectedStocks(id) {
     const prefix = 'filament-bestand:';
@@ -465,7 +474,8 @@ function addLocationSection(card, readStock, saveStock) {
         remove.hidden = true;
         editor.append(removeLocationPanel(place,remove));
       };
-      row.append(remove);
+      remove.className = 'location-remove-button';
+      editor.append(remove);
     }
     return editor;
   }
