@@ -5,7 +5,7 @@
 <title>Filament-Trockenbox</title>
 <style>
 :root{color-scheme:dark;font:16px/1.5 system-ui,sans-serif;background:#10161c;color:#f2f7f6;--mint:#a4f4ce;--muted:#b0c2c7}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top right,#20443d,transparent 55%);min-height:100vh}main{max-width:54rem;margin:auto;padding:clamp(1rem,5vw,3rem)}header{padding:2rem 0}h1{font-size:clamp(2rem,7vw,4rem);line-height:1.08;margin:.4rem 0}h2{font-size:clamp(1.4rem,5vw,2rem);margin:.25rem 0}.label{font-size:.78rem;text-transform:uppercase;letter-spacing:.15em;color:var(--mint);font-weight:700}p,dt{color:var(--muted)}article,form{background:#18242c;border:1px solid #38514f;border-radius:1.4rem;padding:clamp(1rem,4vw,2rem);margin:1rem 0}article:target{border-color:var(--mint)}dl,.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr));gap:.7rem}dl div{background:#111b21;border-radius:.7rem;padding:.75rem}dt{font-size:.82rem}dd{font-weight:700;margin:.2rem 0 0;overflow-wrap:anywhere}a{color:var(--mint)}input,button{font:inherit;border-radius:.6rem;padding:.65rem .8rem}input{width:100%;background:#111b21;color:inherit;border:1px solid #58716e}button{background:var(--mint);color:#112820;border:0;font-weight:700;cursor:pointer;margin-top:1rem}summary{cursor:pointer;color:var(--mint)}footer{margin:2rem 0;color:var(--muted)}
-[hidden]{display:none!important}select{width:100%;font:inherit;padding:.65rem;border-radius:.6rem;background:#111b21;color:inherit;border:1px solid #58716e}.swatch{display:inline-block;width:.9rem;height:.9rem;margin-right:.5rem;vertical-align:-.1rem;border:1px solid #a6b9bd;border-radius:50%;background:var(--swatch)}.drying{grid-column:1/-1}.drying ul{margin:0;padding-left:1.2rem}article details{margin-top:1rem}article details img{display:block;margin:.8rem 0}#all-rolls{display:inline-block;margin-bottom:.5rem}main:has(#overview[hidden]) header{padding:.6rem 0}main:has(#overview[hidden]) header h1{font-size:1.4rem}main:has(#overview[hidden]) header p{display:none}
+[hidden]{display:none!important}select{width:100%;font:inherit;padding:.65rem;border-radius:.6rem;background:#111b21;color:inherit;border:1px solid #58716e}.card-heading{display:flex;align-items:center;gap:1rem}.card-heading-text{min-width:0}.swatch{display:block;flex:none;width:clamp(2.75rem,11vw,3.75rem);aspect-ratio:1;border:2px solid #a6b9bd;border-radius:50%;background:var(--swatch)}.drying{grid-column:1/-1}.drying ul{margin:0;padding-left:1.2rem}article details{margin-top:1rem}article details img{display:block;margin:.8rem 0}#all-rolls{display:inline-block;margin-bottom:.5rem}main:has(#overview[hidden]) header{padding:.6rem 0}main:has(#overview[hidden]) header h1{font-size:1.4rem}main:has(#overview[hidden]) header p{display:none}
 </style>
 <main>
 <header><span class="label">Filamentlager</span><h1>Filament-Trockenbox</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -276,7 +276,16 @@ function prepareCard(card, color) {
   swatch.className = 'swatch';
   swatch.style.setProperty('--swatch', colors[color] ?? 'transparent');
   swatch.setAttribute('aria-hidden','true');
-  card.querySelector('.label').prepend(swatch);
+  const label = card.querySelector('.label');
+  const heading = card.querySelector('h2');
+  const cardHeading = element('div','');
+  cardHeading.className = 'card-heading';
+  const text = element('div','');
+  text.className = 'card-heading-text';
+  label.before(cardHeading);
+  text.append(label,heading);
+  if (Object.hasOwn(colors,color)) cardHeading.append(swatch);
+  cardHeading.append(text);
   const profile = element('details','');
   profile.append(element('summary','Eigene Druckwerte für den X2D'));
   const editor = element('form','');
