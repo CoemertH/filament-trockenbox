@@ -8,6 +8,7 @@
 [hidden]{display:none!important}select{width:100%;font:inherit;padding:.65rem;border-radius:.6rem;background:#111b21;color:inherit;border:1px solid #58716e}.card-heading{display:flex;align-items:center;gap:1rem}.card-heading-text{min-width:0}.swatch{display:block;flex:none;width:clamp(2.75rem,11vw,3.75rem);aspect-ratio:1;border:2px solid #a6b9bd;border-radius:50%;background:var(--swatch)}.drying{grid-column:1/-1}.drying ul{margin:0;padding-left:1.2rem}article details{margin-top:1rem}article details img{display:block;margin:.8rem 0}#all-rolls{display:inline-block;margin-bottom:.5rem}main:has(#overview[hidden]) header{padding:.6rem 0}main:has(#overview[hidden]) header h1{font-size:1.4rem}main:has(#overview[hidden]) header p{display:none}
 article:target > .open-roll{display:none}
 .available-filter{display:flex;gap:.6rem;align-items:center;margin-top:.75rem}.available-filter input{width:auto}.stock-undo{margin-top:0}
+.stock-weight-save{grid-column:1/-1;display:flex;gap:.55rem;align-items:flex-end}.stock-weight-save label{flex:1;min-width:0}.stock-weight-save button{flex:0 0 auto;margin:0;border-radius:.35rem;padding:.65rem .75rem;max-width:48%}
 </style>
 <main>
 <header><span class="label">Filamentlager</span><h1>Filament Bestand</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -354,10 +355,31 @@ function addStockSection(card, profile) {
     empty.oninput = updateWeight;
     updateWeight();
     fields.append(conditionLabel,grossLabel,emptyLabel,weightLabel);
-    const save = element('button',roll ? 'Rolle speichern' : 'Rolle hinzufügen');
-    editor.append(fields,save);
+    const save = element('button',roll ? 'Änderung speichern' : 'Rolle hinzufügen');
+    editor.append(fields);
+    if (roll) {
+      const row = element('div','');
+      row.className = 'stock-weight-save';
+      weightLabel.before(row);
+      row.append(weightLabel,save);
+      const inputs = [condition,gross,empty,weight];
+      const original = inputs.map(input=>input.value);
+      const updateSaveButton = () => {
+        save.hidden = !inputs.some((input,index)=>input.value!==original[index]);
+        save.disabled = save.hidden;
+      };
+      editor.addEventListener('input',updateSaveButton);
+      editor.addEventListener('change',updateSaveButton);
+      editor.addEventListener('keydown',event => {
+        if (event.key==='Enter' && event.target instanceof HTMLInputElement) event.preventDefault();
+      });
+      updateSaveButton();
+    } else {
+      editor.append(save);
+    }
     editor.onsubmit = event => {
       event.preventDefault();
+      if (roll && save.hidden) return;
       const stock = readStock();
       const updated = {id:roll?.id ?? crypto.randomUUID(),packaging:condition.value,weight:weight.value,gross:gross.value,tare:empty.value};
       saveStock(roll ? stock.map(item=>item.id===roll.id ? updated : item) : [...stock,updated]);
