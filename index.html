@@ -9,6 +9,7 @@
 article:target > .open-roll{display:none}
 .available-filter{display:flex;gap:.6rem;align-items:center;margin-top:.75rem}.available-filter input{width:auto}.stock-undo{margin-top:0}
 .stock-weight-save{grid-column:1/-1;display:flex;gap:.55rem;align-items:flex-end}.stock-weight-save label{flex:1;min-width:0}.stock-weight-save button{flex:0 0 auto;margin:0;border-radius:.35rem;padding:.65rem .75rem;max-width:48%}
+.stock-weight-save > [role=status]{padding:.65rem .75rem;color:var(--mint);border:1px solid #58716e;border-radius:.35rem}
 </style>
 <main>
 <header><span class="label">Filamentlager</span><h1>Filament Bestand</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -284,12 +285,27 @@ function addStockSection(card, profile) {
   tareInput.step = 'any';
   tareInput.value = defaultTare;
   tareLabel.append(tareInput);
-  tareForm.append(tareLabel,element('button','Leergewicht speichern'));
+  const tareRow = element('div','');
+  tareRow.className = 'stock-weight-save';
+  const tareSave = element('button','Leergewicht speichern');
+  const tareSaved = element('span','Gespeichert');
+  tareSaved.setAttribute('role','status');
+  tareSave.hidden = tareSave.disabled = true;
+  tareSaved.hidden = true;
+  tareRow.append(tareLabel,tareSave,tareSaved);
+  tareForm.append(tareRow);
+  tareInput.oninput = () => {
+    tareSave.hidden = tareSave.disabled = tareInput.value === defaultTare;
+    tareSaved.hidden = true;
+  };
   tareForm.onsubmit = event => {
     event.preventDefault();
+    if (tareInput.value === defaultTare) return;
     try { localStorage.setItem(tareKey,tareInput.value); }
     catch { feedback.textContent = 'Das Leergewicht konnte nicht gespeichert werden.'; return; }
     defaultTare = tareInput.value;
+    tareSave.hidden = tareSave.disabled = true;
+    tareSaved.hidden = false;
     renderStock(readStock());
     feedback.textContent = 'Standard-Leergewicht gespeichert.';
   };
@@ -307,15 +323,15 @@ function addStockSection(card, profile) {
     } catch {}
     return initial;
   }
-  function saveStock(next) {
+  function saveStock(next, savedRollId) {
     try { localStorage.setItem(storageKey,JSON.stringify(next)); }
     catch { feedback.textContent = 'Der Bestand konnte in diesem Browser nicht gespeichert werden.'; return; }
-    renderStock(next);
+    renderStock(next,savedRollId);
     filter();
     feedback.textContent = 'Bestand gespeichert.';
     return true;
   }
-  function stockForm(roll, index) {
+  function stockForm(roll, index, savedRollId) {
     const editor = element('form','');
     if (roll) editor.append(element('strong','Rolle ' + (index + 1)));
     const fields = element('div','');
@@ -361,10 +377,13 @@ function addStockSection(card, profile) {
       const row = element('div','');
       row.className = 'stock-weight-save';
       weightLabel.before(row);
-      row.append(weightLabel,save);
+      const saved = element('span','Gespeichert');
+      saved.setAttribute('role','status');
+      row.append(weightLabel,save,saved);
       const inputs = [condition,gross,empty,weight];
       const original = inputs.map(input=>input.value);
       const updateSaveButton = () => {
+        saved.hidden = true;
         save.hidden = !inputs.some((input,index)=>input.value!==original[index]);
         save.disabled = save.hidden;
       };
@@ -374,6 +393,7 @@ function addStockSection(card, profile) {
         if (event.key==='Enter' && event.target instanceof HTMLInputElement) event.preventDefault();
       });
       updateSaveButton();
+      saved.hidden = roll.id !== savedRollId;
     } else {
       editor.append(save);
     }
@@ -382,7 +402,7 @@ function addStockSection(card, profile) {
       if (roll && save.hidden) return;
       const stock = readStock();
       const updated = {id:roll?.id ?? crypto.randomUUID(),packaging:condition.value,weight:weight.value,gross:gross.value,tare:empty.value};
-      saveStock(roll ? stock.map(item=>item.id===roll.id ? updated : item) : [...stock,updated]);
+      saveStock(roll ? stock.map(item=>item.id===roll.id ? updated : item) : [...stock,updated],roll?.id);
     };
     if (roll) {
       const remove = element('button','Rolle aufgebraucht');
@@ -401,7 +421,7 @@ function addStockSection(card, profile) {
     }
     return editor;
   }
-  function renderStock(stock) {
+  function renderStock(stock, savedRollId) {
     const parts = ['Bestand: ' + stock.length + (stock.length===1 ? ' Rolle' : ' Rollen')];
     for (const [status,label] of [['sealed','originalverpackt'],['opened','angebrochen']]) {
       const count = stock.filter(item=>item.packaging===status).length;
@@ -416,7 +436,7 @@ function addStockSection(card, profile) {
     if (missing) parts.push(missing + (missing===1 ? ' Restgewicht offen' : ' Restgewichte offen'));
     card.dataset.stockCount = String(stock.length);
     summary.textContent = parts.join(' · ');
-    entries.replaceChildren(...stock.map(stockForm),stockForm(null));
+    entries.replaceChildren(...stock.map((roll,index)=>stockForm(roll,index,savedRollId)),stockForm(null));
   }
   undo.onclick = () => {
     if (!removed || !saveStock([...readStock(),removed])) return;
