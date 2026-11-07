@@ -6,7 +6,7 @@
 <style>
 :root{color-scheme:dark;font:16px/1.5 system-ui,sans-serif;background:#10161c;color:#f2f7f6;--mint:#a4f4ce;--muted:#b0c2c7}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top right,#20443d,transparent 55%);min-height:100vh}main{max-width:54rem;margin:auto;padding:clamp(1rem,5vw,3rem)}header{padding:2rem 0}h1{font-size:clamp(2rem,7vw,4rem);line-height:1.08;margin:.4rem 0}h2{font-size:clamp(1.4rem,5vw,2rem);margin:.25rem 0}.label{font-size:.78rem;text-transform:uppercase;letter-spacing:.15em;color:var(--mint);font-weight:700}p,dt{color:var(--muted)}article,form{background:#18242c;border:1px solid #38514f;border-radius:1.4rem;padding:clamp(1rem,4vw,2rem);margin:1rem 0}article:target{border-color:var(--mint)}dl,.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr));gap:.7rem}dl div{background:#111b21;border-radius:.7rem;padding:.75rem}dt{font-size:.82rem}dd{font-weight:700;margin:.2rem 0 0;overflow-wrap:anywhere}a{color:var(--mint)}input,button{font:inherit;border-radius:.6rem;padding:.65rem .8rem}input{width:100%;background:#111b21;color:inherit;border:1px solid #58716e}button{background:var(--mint);color:#112820;border:0;font-weight:700;cursor:pointer;margin-top:1rem}summary{cursor:pointer;color:var(--mint)}footer{margin:2rem 0;color:var(--muted)}
 [hidden]{display:none!important}select{width:100%;font:inherit;padding:.65rem;border-radius:.6rem;background:#111b21;color:inherit;border:1px solid #58716e}.card-heading{display:flex;align-items:center;gap:1rem}.card-heading-text{min-width:0}.swatch{display:block;flex:none;width:clamp(2.75rem,11vw,3.75rem);aspect-ratio:1;border:2px solid #a6b9bd;border-radius:50%;background:var(--swatch)}.drying{grid-column:1/-1}.drying ul{margin:0;padding-left:1.2rem}article details{margin-top:1rem}article details img{display:block;margin:.8rem 0}#all-rolls{display:inline-block;margin-bottom:.5rem}main:has(#overview[hidden]) header{padding:.6rem 0}main:has(#overview[hidden]) header h1{font-size:1.4rem}main:has(#overview[hidden]) header p{display:none}
-article .copy-roll-link{display:none}article:target .copy-roll-link{display:block}article:target > a[href^="#"]{display:none}.copy-roll-link button{margin-top:0}.copy-roll-link input{margin-top:.5rem}
+article:target > .open-roll{display:none}
 </style>
 <main>
 <header><span class="label">Filamentlager</span><h1>Filament-Trockenbox</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -30,7 +30,8 @@ article .copy-roll-link{display:none}article:target .copy-roll-link{display:bloc
   </dl>
   <p>Bambu Lab empfiehlt das Trocknen bei Feuchtigkeit oder Sprödigkeit. Bisheriger Eintrag: 70 °C für 8 Stunden. Das technische Datenblatt nennt für die Düse alternativ 190–240 °C.</p>
   <p><a href="https://bambulab-us.myshopify.com/products/support-for-pla-petg">Bambu Lab Produktseite</a> · <a href="https://store.bblcdn.eu/s8/default/1f4a4af9a2624468b412f4bee647408a/Bambu_Support_for_PLA_PETG_Technical_Data_Sheet.pdf">Technisches Datenblatt</a></p>
-  <a href="#support-pla-petg-schwarz">Direktlink zur Rolle</a>
+  <p class="product-link"><a href="https://bambulab-us.myshopify.com/products/support-for-pla-petg" target="_blank" rel="noopener">Produktseite beim Hersteller</a></p>
+  <a class="open-roll" href="#support-pla-petg-schwarz">Filamentkarte öffnen</a>
 </article>
 <article id="petg-matt-gruen-03460604a">
   <span class="label">Rolle 02 · Grün</span>
@@ -48,7 +49,8 @@ article .copy-roll-link{display:none}article:target .copy-roll-link{display:bloc
   </dl>
   <p>Die Marke der grünen Rolle ist anhand des Etiketts nicht bestätigt. Die Druckwerte stammen vom Etikett, die Trocknungswerte sind als Vergleich angegeben.</p>
   <p><a href="https://uk.store.sunlu.com/collections/fdm-filament-bundle-sales/products/high-speed-matte-petg-3d-printer-filament-1kg">SUNLU Trocknungsempfehlung für PETG Matt HS</a></p>
-  <a href="#petg-matt-gruen-03460604a">Direktlink zur Rolle</a>
+  <p class="product-link"><a href="https://www.sunlu.com/products/256" target="_blank" rel="noopener">Vergleichsprodukt bei SUNLU</a></p>
+  <a class="open-roll" href="#petg-matt-gruen-03460604a">Filamentkarte öffnen</a>
 </article>
 <article id="sunlu-pla-plus-weiss">
   <span class="label">Rolle 03 · Weiß</span>
@@ -66,7 +68,8 @@ article .copy-roll-link{display:none}article:target .copy-roll-link{display:bloc
   </dl>
   <p>Druckwerte laut Etikett. Trocknungswerte laut SUNLU-Leitfaden für PLA und PLA+.</p>
   <p><a href="https://www.sunlu.com/wiki/quick-start-guide-new-user-fdm">SUNLU Trocknungsleitfaden</a></p>
-  <a href="#sunlu-pla-plus-weiss">Direktlink zur Rolle</a>
+  <p class="product-link"><a href="https://www.sunlu.com/de/products/pla-plus-filament" target="_blank" rel="noopener">Produktseite beim Hersteller</a></p>
+  <a class="open-roll" href="#sunlu-pla-plus-weiss">Filamentkarte öffnen</a>
 </article>
 <article id="sunlu-pla-plus-rot">
   <span class="label">Rolle 04 · Rot</span>
@@ -84,7 +87,8 @@ article .copy-roll-link{display:none}article:target .copy-roll-link{display:bloc
   </dl>
   <p>Druckwerte laut Etikett. Trocknungswerte laut SUNLU-Leitfaden für PLA und PLA+.</p>
   <p><a href="https://www.sunlu.com/wiki/quick-start-guide-new-user-fdm">SUNLU Trocknungsleitfaden</a></p>
-  <a href="#sunlu-pla-plus-rot">Direktlink zur Rolle</a>
+  <p class="product-link"><a href="https://www.sunlu.com/de/products/pla-plus-filament" target="_blank" rel="noopener">Produktseite beim Hersteller</a></p>
+  <a class="open-roll" href="#sunlu-pla-plus-rot">Filamentkarte öffnen</a>
 </article>
 <article id="sunlu-petg-matt-orange">
   <span class="label">Rolle 05 · Orange</span>
@@ -102,7 +106,8 @@ article .copy-roll-link{display:none}article:target .copy-roll-link{display:bloc
   </dl>
   <p>Die Druckwerte stammen vom Etikett dieser Rolle. Die Trocknungsempfehlung gilt für SUNLU S4 und E2.</p>
   <p><a href="https://uk.store.sunlu.com/collections/fdm-filament-bundle-sales/products/high-speed-matte-petg-3d-printer-filament-1kg">SUNLU Trocknungsempfehlung für PETG Matt HS</a></p>
-  <a href="#sunlu-petg-matt-orange">Direktlink zur Rolle</a>
+  <p class="product-link"><a href="https://www.sunlu.com/products/256" target="_blank" rel="noopener">Produktseite beim Hersteller</a></p>
+  <a class="open-roll" href="#sunlu-petg-matt-orange">Filamentkarte öffnen</a>
 </article>
 <article id="sunlu-petg-matt-blau">
   <span class="label">Rolle 06 · Blau</span>
@@ -120,7 +125,8 @@ article .copy-roll-link{display:none}article:target .copy-roll-link{display:bloc
   </dl>
   <p>Die Druckwerte stammen vom Etikett dieser Rolle. Die Trocknungsempfehlung gilt für SUNLU S4 und E2.</p>
   <p><a href="https://uk.store.sunlu.com/collections/fdm-filament-bundle-sales/products/high-speed-matte-petg-3d-printer-filament-1kg">SUNLU Trocknungsempfehlung für PETG Matt HS</a></p>
-  <a href="#sunlu-petg-matt-blau">Direktlink zur Rolle</a>
+  <p class="product-link"><a href="https://www.sunlu.com/products/256" target="_blank" rel="noopener">Produktseite beim Hersteller</a></p>
+  <a class="open-roll" href="#sunlu-petg-matt-blau">Filamentkarte öffnen</a>
 </article>
 <article id="sunlu-pla-plus-schwarz">
   <span class="label">Rolle 07 · Schwarz</span>
@@ -138,7 +144,8 @@ article .copy-roll-link{display:none}article:target .copy-roll-link{display:bloc
   </dl>
   <p>Druckwerte laut Etikett. Trocknungswerte laut SUNLU-Leitfaden für PLA und PLA+.</p>
   <p><a href="https://www.sunlu.com/wiki/quick-start-guide-new-user-fdm">SUNLU Trocknungsleitfaden</a></p>
-  <a href="#sunlu-pla-plus-schwarz">Direktlink zur Rolle</a>
+  <p class="product-link"><a href="https://www.sunlu.com/de/products/pla-plus-filament" target="_blank" rel="noopener">Produktseite beim Hersteller</a></p>
+  <a class="open-roll" href="#sunlu-pla-plus-schwarz">Filamentkarte öffnen</a>
 </article>
 <article id="sunlu-pla-plus-klein-blau">
   <span class="label">Rolle 08 · Klein-Blau</span>
@@ -156,7 +163,8 @@ article .copy-roll-link{display:none}article:target .copy-roll-link{display:bloc
   </dl>
   <p>Druckwerte laut Etikett. Trocknungswerte laut SUNLU-Leitfaden für PLA und PLA+.</p>
   <p><a href="https://www.sunlu.com/wiki/quick-start-guide-new-user-fdm">SUNLU Trocknungsleitfaden</a></p>
-  <a href="#sunlu-pla-plus-klein-blau">Direktlink zur Rolle</a>
+  <p class="product-link"><a href="https://www.sunlu.com/de/products/pla-plus-filament" target="_blank" rel="noopener">Produktseite beim Hersteller</a></p>
+  <a class="open-roll" href="#sunlu-pla-plus-klein-blau">Filamentkarte öffnen</a>
 </article>
 <article id="bambu-lab-pla-matt-grau">
   <span class="label">Rolle 09 · Grau</span>
@@ -174,7 +182,8 @@ article .copy-roll-link{display:none}article:target .copy-roll-link{display:bloc
   </dl>
   <p>Der EU-Shop nennt 55 °C für 8 Stunden. Das technische Datenblatt nennt für denselben Trocknertyp 50 °C für 8 Stunden.</p>
   <p><a href="https://bambulab-eu.myshopify.com/de/products/pla-matte-filament-de">Herstellerangaben im Bambu Lab EU-Shop</a> · <a href="https://store.bblcdn.eu/s8/default/82bab351a9494e318ab485f7c31a01b3/Bambu_PLA_Matte_Technical_Data_Sheet.pdf">Technisches Datenblatt</a></p>
-  <a href="#bambu-lab-pla-matt-grau">Direktlink zur Rolle</a>
+  <p class="product-link"><a href="https://bambulab-eu.myshopify.com/de/products/pla-matte-filament-de" target="_blank" rel="noopener">Produktseite beim Hersteller</a></p>
+  <a class="open-roll" href="#bambu-lab-pla-matt-grau">Filamentkarte öffnen</a>
 </article>
 <article id="sunlu-abs-hs-schwarz">
   <span class="label">Rolle 10 · Schwarz</span>
@@ -192,7 +201,8 @@ article .copy-roll-link{display:none}article:target .copy-roll-link{display:bloc
   </dl>
   <p>Die allgemeine SUNLU-ABS-Empfehlung von 75–85 °C liegt über der aufgedruckten Temperaturgrenze dieser Spule. Der Wert von 50 °C stammt aus der Anleitung für ABS HS.</p>
   <p><a href="https://www.sunlu.com/wiki/high-speed-filament">SUNLU Produktleitfaden für ABS HS</a> · <a href="https://www.sunlu.com/wiki/quick-start-guide-new-user-fdm">Allgemeiner SUNLU Trocknungsleitfaden</a></p>
-  <a href="#sunlu-abs-hs-schwarz">Direktlink zur Rolle</a>
+  <p class="product-link"><a href="https://www.sunlu.com/products/high-speed-abs-filament" target="_blank" rel="noopener">Produktseite beim Hersteller</a></p>
+  <a class="open-roll" href="#sunlu-abs-hs-schwarz">Filamentkarte öffnen</a>
 </article>
 <article id="bambu-lab-pla-basic-beige">
   <span class="label">Rolle 11 · Beige</span>
@@ -210,7 +220,8 @@ article .copy-roll-link{display:none}article:target .copy-roll-link{display:bloc
   </dl>
   <p>Die französische Shopseite nennt für den Umluft-Trockenschrank 55 °C. Der englischsprachige EU-Shop und das technische Datenblatt nennen 50 °C.</p>
   <p><a href="https://bambulab-eu.myshopify.com/en-be/products/pla-basic-filament">Bambu Lab EU-Shop · Produktdaten und Trocknung</a> · <a href="https://bambulab-eu.myshopify.com/fr/products/pla-basic-filament">Bambu Lab EU-Shop · Druckeinstellungen</a> · <a href="https://store.bblcdn.eu/s8/default/073e722a4aa44f7cbfdc419d597475cc/Bambu_PLA_Basic_Technical_Data_Sheet.pdf">Technisches Datenblatt</a></p>
-  <a href="#bambu-lab-pla-basic-beige">Direktlink zur Rolle</a>
+  <p class="product-link"><a href="https://bambulab-eu.myshopify.com/products/pla-basic-filament" target="_blank" rel="noopener">Produktseite beim Hersteller</a></p>
+  <a class="open-roll" href="#bambu-lab-pla-basic-beige">Filamentkarte öffnen</a>
 </article>
 <article id="bambu-lab-pla-matt-marineblau">
   <span class="label">Rolle 12 · Marineblau</span>
@@ -228,7 +239,8 @@ article .copy-roll-link{display:none}article:target .copy-roll-link{display:bloc
   </dl>
   <p>Der EU-Shop nennt 55 °C für 8 Stunden. Das technische Datenblatt nennt für denselben Trocknertyp 50 °C für 8 Stunden.</p>
   <p><a href="https://bambulab-eu.myshopify.com/de/products/pla-matte-filament-de">Herstellerangaben im Bambu Lab EU-Shop</a> · <a href="https://store.bblcdn.eu/s8/default/82bab351a9494e318ab485f7c31a01b3/Bambu_PLA_Matte_Technical_Data_Sheet.pdf">Technisches Datenblatt</a></p>
-  <a href="#bambu-lab-pla-matt-marineblau">Direktlink zur Rolle</a>
+  <p class="product-link"><a href="https://bambulab-eu.myshopify.com/de/products/pla-matte-filament-de" target="_blank" rel="noopener">Produktseite beim Hersteller</a></p>
+  <a class="open-roll" href="#bambu-lab-pla-matt-marineblau">Filamentkarte öffnen</a>
 </article>
 </section>
 <p id="empty" hidden>Keine passende Rolle gefunden.</p>
@@ -364,36 +376,8 @@ for (const card of cards.querySelectorAll('article[id]')) {
   const manufacturer = element('details','');
   manufacturer.append(element('summary','Herstellerangaben'));
   specs.before(manufacturer);
-  manufacturer.append(specs,...card.querySelectorAll(':scope > p'));
+  manufacturer.append(specs,...card.querySelectorAll(':scope > p:not(.product-link)'));
   const drying = [...specs.children].filter(field=>field.querySelector('dt').textContent.startsWith('Trocknung'));
-  const directLink = card.querySelector(':scope > a[href^="#"]');
-  if (directLink) {
-    const copySection = element('div','');
-    copySection.className = 'copy-roll-link';
-    const copyButton = element('button','Direktlink kopieren');
-    copyButton.type = 'button';
-    const feedback = element('span','');
-    feedback.setAttribute('role','status');
-    const address = element('input','');
-    address.setAttribute('aria-label','Direktlink zur Rolle');
-    address.readOnly = true;
-    address.hidden = true;
-    address.value = directLink.href;
-    copyButton.onclick = async () => {
-      try {
-        await navigator.clipboard.writeText(address.value);
-        feedback.textContent = ' Direktlink kopiert.';
-        address.hidden = true;
-      } catch {
-        feedback.textContent = ' Link zum Kopieren markiert.';
-        address.hidden = false;
-        address.focus();
-        address.select();
-      }
-    };
-    copySection.append(copyButton,feedback,address);
-    directLink.after(copySection);
-  }
   if (qrCodes[card.id]) addQr(card,qrCodes[card.id]);
   if (drying.length !== 2) continue;
   drying[0].querySelector('dt').textContent = 'Trocknung nach Gerät';
