@@ -12,6 +12,7 @@ article:target > .open-roll{display:none}
 .stock-weight-save > [role=status]{padding:.65rem .75rem;color:var(--mint);border:1px solid #58716e;border-radius:.35rem}
 .profile-save-row{grid-column:auto;min-width:0;flex-wrap:wrap}.profile-save-row label{flex:1 1 8rem}.profile-save-row button{max-width:100%}.profile-save-row p{margin:0}
 .location-panel{margin-top:.6rem}.location-layout{display:flex;align-items:flex-start;gap:.6rem;flex-wrap:wrap}.location-layout>div{flex:1 1 13rem;min-width:0}.location-layout>button{margin:0}.location-form{padding:.6rem;margin:0 0 .5rem}.location-manager{margin-top:.75rem}.location-manager h3{margin:0 0 .5rem}
+.location-remove{padding:.65rem;margin-top:.6rem;border:1px solid #58716e;border-radius:.6rem}.location-remove button+button{margin-inline-start:.5rem}.location-manager .stock-weight-save{flex-wrap:wrap}.location-manager .stock-weight-save button{max-width:100%}
 </style>
 <main>
 <header><span class="label">Filamentlager</span><h1>Filament Bestand</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -349,6 +350,79 @@ function addLocationSection(card, readStock, saveStock) {
     };
     manager.append(create);
   }
+  function affectedStocks(id) {
+    const prefix = 'filament-bestand:';
+    const affected = [];
+    for (const key of Object.keys(localStorage).filter(key=>key.startsWith(prefix))) {
+      const raw = localStorage.getItem(key);
+      const stock = JSON.parse(raw);
+      if (!Array.isArray(stock)) continue;
+      const rows = stock.map((roll,index)=>({roll,index})).filter(({roll})=>roll?.locationId===id);
+      if (rows.length) affected.push({key,raw,stock,rows});
+    }
+    return affected;
+  }
+  function removeLocationPanel(place, trigger) {
+    const panel = element('div','');
+    panel.className = 'location-remove';
+    function preview() {
+      panel.replaceChildren(element('strong','„'+place.name+'“ entfernen?'));
+      let affected;
+      try { affected = affectedStocks(place.id); }
+      catch { panel.append(element('p','Die gespeicherten Zuordnungen konnten nicht geprüft werden.')); return; }
+      const replacement = element('select','');
+      replacement.add(new Option('Nicht angegeben',''));
+      for (const item of readLocations().filter(item=>item.id!==place.id)) replacement.add(new Option(item.name,item.id));
+      if (affected.length) {
+        panel.append(element('p','Betroffene Rollen'));
+        const list = element('ul','');
+        for (const entry of affected) {
+          const item = document.getElementById(entry.key.slice('filament-bestand:'.length));
+          const title = item ? item.querySelector('h2').textContent+' · '+item.dataset.color : 'Gespeicherte Filamentkarte';
+          for (const {index} of entry.rows) list.append(element('li',title+' · Rolle '+(index+1)));
+        }
+        const label = element('label','Neuer Lagerort für diese Rollen');
+        label.append(replacement);
+        panel.append(list,label);
+      } else {
+        panel.append(element('p','Diesem Lagerort sind keine Rollen zugewiesen.'));
+      }
+      const confirm = element('button','Lagerort endgültig entfernen');
+      const cancel = element('button','Abbrechen');
+      confirm.type = cancel.type = 'button';
+      cancel.onclick = () => { panel.remove(); trigger.hidden = false; trigger.focus(); };
+      confirm.onclick = () => {
+        const written = [];
+        try {
+          const current = affectedStocks(place.id);
+          const locations = readLocations();
+          if (JSON.stringify(current.map(entry=>[entry.key,entry.raw]))!==JSON.stringify(affected.map(entry=>[entry.key,entry.raw])) ||
+              (replacement.value && !locations.some(item=>item.id===replacement.value))) {
+            preview();
+            feedback.textContent = 'Die Zuordnungen haben sich geändert. Bitte prüfe die Liste erneut.';
+            return;
+          }
+          for (const entry of current) {
+            const next = entry.stock.map(roll=>roll?.locationId===place.id ? {...roll,locationId:replacement.value} : roll);
+            localStorage.setItem(entry.key,JSON.stringify(next));
+            written.push(entry);
+          }
+          localStorage.setItem(locationKey,JSON.stringify(locations.filter(item=>item.id!==place.id)));
+        } catch {
+          for (const entry of written.reverse()) {
+            try { localStorage.setItem(entry.key,entry.raw); } catch {}
+          }
+          feedback.textContent = 'Der Lagerort konnte nicht entfernt werden.';
+          return;
+        }
+        for (const currentCard of cards.children) currentCard.dispatchEvent(new Event('locations-changed'));
+        feedback.textContent = 'Lagerort entfernt.';
+      };
+      panel.append(confirm,cancel);
+    }
+    preview();
+    return panel;
+  }
   function locationForm(place) {
     const editor = element('form','');
     editor.className = 'location-form';
@@ -384,6 +458,15 @@ function addLocationSection(card, readStock, saveStock) {
     };
     row.append(label,save);
     editor.append(row);
+    if (place) {
+      const remove = element('button','Lagerort entfernen');
+      remove.type = 'button';
+      remove.onclick = () => {
+        remove.hidden = true;
+        editor.append(removeLocationPanel(place,remove));
+      };
+      row.append(remove);
+    }
     return editor;
   }
   manage.onclick = () => {
