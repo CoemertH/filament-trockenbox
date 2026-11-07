@@ -15,6 +15,7 @@ article:target > .open-roll{display:none}
 .location-remove{padding:.65rem;margin-top:.6rem;border:1px solid #58716e;border-radius:.6rem}.location-remove button+button{margin-inline-start:.5rem}.location-manager .stock-weight-save{flex-wrap:wrap}.location-manager .stock-weight-save button{max-width:100%}
 .location-remove-button{display:block;margin-top:.55rem}.location-create-row{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr);align-items:start;gap:.55rem}.location-create-row>button{margin:0;max-width:8.5rem;white-space:normal}.location-create-row>.location-form{min-width:0;padding:0;border:0;background:transparent;margin:0}.location-create-row .stock-weight-save{display:grid;gap:.4rem}.location-create-row .stock-weight-save button{justify-self:start}
 #main-menu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-bottom:1.1rem}#main-menu a{display:block;text-align:center;padding:.65rem .45rem;border:1px solid #58716e;border-radius:.6rem;font-weight:700;text-decoration:none}#main-menu a[aria-current=page]{background:var(--mint);color:#112820}.location-stock-group{background:#18242c;border:1px solid #38514f;border-radius:.8rem;padding:.75rem 1rem;margin:.7rem 0}.location-stock-group h3,.location-stock-group ul,.location-stock-group p{margin:.35rem 0}.location-stock-group li+li{margin-top:.25rem}
+.stock-detail>article>:not(.card-heading):not(.locations):not(.stock){display:none!important}.stock-cancel{margin-inline-start:.5rem}
 </style>
 <main>
 <header><h1>Filamentlager</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -600,7 +601,7 @@ function addStockSection(card, profile) {
     empty.oninput = updateWeight;
     updateWeight();
     fields.append(conditionLabel,grossLabel,emptyLabel,weightLabel);
-    const save = element('button',roll ? 'Änderung speichern' : 'Rolle hinzufügen');
+    const save = element('button',roll ? 'Änderung speichern' : 'Rolle speichern');
     editor.append(fields);
     if (roll) {
       const row = element('div','');
@@ -665,7 +666,31 @@ function addStockSection(card, profile) {
     if (missing) parts.push(missing + (missing===1 ? ' Restgewicht offen' : ' Restgewichte offen'));
     card.dataset.stockCount = String(stock.length);
     summary.textContent = parts.join(' · ');
-    entries.replaceChildren(...stock.map((roll,index)=>stockForm(roll,index,savedRollId)),stockForm(null));
+    const add = element('button','Rolle hinzufügen');
+    add.type = 'button';
+    add.className = 'stock-add';
+    add.setAttribute('aria-expanded','false');
+    const draft = element('div','');
+    draft.hidden = true;
+    add.onclick = () => {
+      if (!draft.hidden) return;
+      const editor = stockForm(null);
+      const cancel = element('button','Abbrechen');
+      cancel.type = 'button';
+      cancel.className = 'stock-cancel';
+      cancel.onclick = () => {
+        draft.hidden = true;
+        draft.replaceChildren();
+        add.setAttribute('aria-expanded','false');
+        add.focus();
+      };
+      editor.append(cancel);
+      draft.replaceChildren(editor);
+      draft.hidden = false;
+      add.setAttribute('aria-expanded','true');
+      editor.querySelector('select').focus();
+    };
+    entries.replaceChildren(...stock.map((roll,index)=>stockForm(roll,index,savedRollId)),add,draft);
   }
   undo.onclick = () => {
     if (!removed || !saveStock([...readStock(),removed])) return;
@@ -912,7 +937,7 @@ function renderLocationOverview() {
       for (const item of items) {
         const line = element('li','');
         const link = element('a',item.title+' · Rolle '+(item.index+1));
-        link.href = '#'+item.id;
+        link.href = '#lagerbestand/'+item.id;
         line.append(link);
         list.append(line);
       }
@@ -922,9 +947,18 @@ function renderLocationOverview() {
   }
   if (!groups.size) locationGroups.append(element('p','Derzeit sind keine Rollen im Bestand.'));
 }
+let previousRoute = null;
 function filter() {
-  const target = document.getElementById(location.hash.slice(1));
+  const route = location.hash.slice(1);
+  const stockPrefix = 'lagerbestand/';
+  const target = document.getElementById(route.startsWith(stockPrefix) ? route.slice(stockPrefix.length) : route);
   const single = target?.parentElement === cards;
+  const stockDetail = single && route.startsWith(stockPrefix);
+  cards.classList.toggle('stock-detail',stockDetail);
+  back.href = stockDetail ? '#bestand-lagerort' : './';
+  back.textContent = stockDetail ? '← Bestand Lagerort' : '← Alle Rollen';
+  if (stockDetail && route!==previousRoute) target.querySelector('.locations').open = true;
+  previousRoute = route;
   const locationsView = target === locationOverview;
   menu.hidden = single;
   overview.hidden = single || locationsView;
@@ -1009,7 +1043,7 @@ form.onsubmit = event => {
       const stock = duplicate.querySelector('.stock');
       stock.open = true;
       stock.scrollIntoView({block:'start'});
-      stock.querySelector('form:last-child button')?.focus();
+      stock.querySelector('.stock-add')?.focus();
     };
     status.replaceChildren('Für dieses Filament gibt es bereits eine Karte. ',show);
     return;
