@@ -1,1 +1,92 @@
-
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Filament-Trockenbox</title>
+<style>
+:root{color-scheme:dark;font:16px/1.5 system-ui,sans-serif;background:#10161c;color:#f2f7f6;--mint:#a4f4ce;--muted:#b0c2c7}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top right,#20443d,transparent 55%);min-height:100vh}main{max-width:54rem;margin:auto;padding:clamp(1rem,5vw,3rem)}header{padding:2rem 0}h1{font-size:clamp(2rem,7vw,4rem);line-height:1.08;margin:.4rem 0}h2{font-size:clamp(1.4rem,5vw,2rem);margin:.25rem 0}.label{font-size:.78rem;text-transform:uppercase;letter-spacing:.15em;color:var(--mint);font-weight:700}p,dt{color:var(--muted)}article,form{background:#18242c;border:1px solid #38514f;border-radius:1.4rem;padding:clamp(1rem,4vw,2rem);margin:1rem 0}article:target{border-color:var(--mint)}dl,.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr));gap:.7rem}dl div{background:#111b21;border-radius:.7rem;padding:.75rem}dt{font-size:.82rem}dd{font-weight:700;margin:.2rem 0 0;overflow-wrap:anywhere}a{color:var(--mint)}input,button{font:inherit;border-radius:.6rem;padding:.65rem .8rem}input{width:100%;background:#111b21;color:inherit;border:1px solid #58716e}button{background:var(--mint);color:#112820;border:0;font-weight:700;cursor:pointer;margin-top:1rem}summary{cursor:pointer;color:var(--mint)}footer{margin:2rem 0;color:var(--muted)}
+</style>
+<main>
+<header><span class="label">Filamentlager</span><h1>Filament-Trockenbox</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
+<label for="search">Rollen suchen</label><input id="search" type="search" placeholder="Material oder Farbe">
+<section id="cards" aria-label="Filamentrollen">
+<article id="support-pla-petg-schwarz"><span class="label">Rolle 01 · Schwarz</span><h2>Support for PLA/PETG</h2><dl><div><dt>Durchmesser</dt><dd>1,75 mm</dd></div><div><dt>Gewicht</dt><dd>500 g</dd></div><div><dt>Drucktemperatur</dt><dd>190–220 °C</dd></div><div><dt>Trocknung</dt><dd>70 °C · 8 Stunden</dd></div></dl><a href="#support-pla-petg-schwarz">Direktlink zur Rolle</a></article>
+</section>
+<p id="empty" hidden>Keine passende Rolle gefunden.</p>
+<details><summary>Eigene Rolle hinzufügen oder bearbeiten</summary>
+<form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Material<input name="material" required maxlength="100"></label><label>Farbe<input name="farbe" required maxlength="60"></label><label>Durchmesser<input name="durchmesser" required placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" required placeholder="500 g"></label><label>Drucktemperatur<input name="druck" required placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" required placeholder="70 °C · 8 Stunden"></label></div><button>Rolle speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
+<footer>Filamentlager · Bambu Lab X2D</footer>
+</main>
+<script>
+const cards = document.querySelector('#cards');
+const search = document.querySelector('#search');
+const form = document.querySelector('#form');
+const reset = document.querySelector('#reset');
+const status = document.querySelector('#status');
+const key = 'filament-trockenbox-rolls';
+const labels = {durchmesser:'Durchmesser',gewicht:'Gewicht',druck:'Drucktemperatur',trocknung:'Trocknung'};
+let rolls = [];
+let editing = null;
+try { const saved = JSON.parse(localStorage.getItem(key)); if (Array.isArray(saved)) rolls = saved; } catch {}
+function element(tag, content) {
+  const node = document.createElement(tag);
+  node.textContent = content;
+  return node;
+}
+function filter() {
+  const query = search.value.trim().toLocaleLowerCase('de');
+  for (const card of cards.children) {
+    card.hidden = ![...card.querySelectorAll('h2,.label')].some(node => node.textContent.toLocaleLowerCase('de').includes(query));
+  }
+  document.querySelector('#empty').hidden = [...cards.children].some(card => !card.hidden);
+}
+function render() {
+  cards.querySelectorAll('[data-local]').forEach(card => card.remove());
+  for (const roll of rolls) {
+    const card = element('article','');
+    card.dataset.local = '';
+    const label = element('span',roll.farbe);
+    label.className = 'label';
+    const specs = element('dl','');
+    for (const [field,title] of Object.entries(labels)) {
+      const item = element('div','');
+      item.append(element('dt',title),element('dd',roll[field]));
+      specs.append(item);
+    }
+    const edit = element('button','Bearbeiten');
+    edit.onclick = () => {
+      editing = roll.id;
+      for (const field of form.querySelectorAll('input')) field.value = roll[field.name];
+      form.closest('details').open = true;
+      reset.hidden = false;
+      status.textContent = '';
+      form.elements.material.focus();
+    };
+    card.append(label,element('h2',roll.material),specs,edit);
+    cards.append(card);
+  }
+  filter();
+}
+function clearEditor() {
+  editing = null;
+  form.reset();
+  reset.hidden = true;
+}
+reset.onclick = () => { clearEditor(); status.textContent = ''; };
+form.onsubmit = event => {
+  event.preventDefault();
+  const fields = Object.fromEntries([...new FormData(form)].map(([field,value]) => [field,value.trim()]));
+  if (Object.values(fields).some(value => !value)) { status.textContent = 'Bitte alle Felder ausfüllen.'; return; }
+  const roll = {...fields,id:editing ?? crypto.randomUUID()};
+  const next = editing ? rolls.map(item => item.id === editing ? roll : item) : [...rolls,roll];
+  try { localStorage.setItem(key,JSON.stringify(next)); } catch { status.textContent = 'Speichern in diesem Browser fehlgeschlagen.'; return; }
+  rolls = next;
+  clearEditor();
+  search.value = '';
+  render();
+  status.textContent = 'Rolle gespeichert.';
+};
+search.oninput = filter;
+render();
+</script>
+</html>
