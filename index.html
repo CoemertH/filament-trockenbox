@@ -379,6 +379,37 @@ for (const card of cards.querySelectorAll('article[id]')) {
   manufacturer.append(specs,...card.querySelectorAll(':scope > p:not(.product-link)'));
   const drying = [...specs.children].filter(field=>field.querySelector('dt').textContent.startsWith('Trocknung'));
   if (qrCodes[card.id]) addQr(card,qrCodes[card.id]);
+  const directLink = card.querySelector('.open-roll');
+  if (directLink) {
+    const share = element('button','Link zum Filament teilen');
+    share.type = 'button';
+    const message = element('p','');
+    message.setAttribute('role','status');
+    message.hidden = true;
+    const address = element('input','');
+    address.readOnly = true;
+    address.hidden = true;
+    address.setAttribute('aria-label','Link zur Filamentkarte');
+    address.value = directLink.href;
+    share.onclick = async () => {
+      try {
+        if (navigator.share) {
+          await navigator.share({title:card.querySelector('h2').textContent,url:address.value});
+          return;
+        }
+        await navigator.clipboard.writeText(address.value);
+        message.textContent = 'Link kopiert.';
+      } catch (error) {
+        if (error.name === 'AbortError') return;
+        address.hidden = false;
+        address.focus();
+        address.select();
+        message.textContent = 'Du kannst den markierten Link kopieren.';
+      }
+      message.hidden = false;
+    };
+    card.append(share,message,address);
+  }
   if (drying.length !== 2) continue;
   drying[0].querySelector('dt').textContent = 'Trocknung nach Gerät';
   const existingDrying = drying.map(field => field.querySelector('dd').textContent).join(' · ');
