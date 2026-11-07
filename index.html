@@ -359,7 +359,12 @@ function addQr(card, packed) {
 }
 for (const card of cards.querySelectorAll('article[id]')) {
   prepareCard(card,card.querySelector('.label').textContent.split(' · ')[1]);
-  const drying = [...card.querySelector('dl').children].filter(field=>field.querySelector('dt').textContent.startsWith('Trocknung'));
+  const specs = card.querySelector('dl');
+  const manufacturer = element('details','');
+  manufacturer.append(element('summary','Herstellerangaben'));
+  specs.before(manufacturer);
+  manufacturer.append(specs,...card.querySelectorAll(':scope > p'));
+  const drying = [...specs.children].filter(field=>field.querySelector('dt').textContent.startsWith('Trocknung'));
   if (qrCodes[card.id]) addQr(card,qrCodes[card.id]);
   if (drying.length !== 2) continue;
   drying[0].querySelector('dt').textContent = 'Trocknung nach Gerät';
