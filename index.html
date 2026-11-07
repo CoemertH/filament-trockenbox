@@ -281,6 +281,82 @@ const dryingByDevice = {
   'bambu-lab-pla-basic-beige': ['Umluft-Trockenschrank · 50 °C · 8 Stunden (Datenblatt und englischer EU-Shop)', 'AMS 2 Pro oder AMS HT · 55 °C · 8 Stunden', 'Umluft-Trockenschrank · 55 °C · 8 Stunden (französischer EU-Shop)'],
   'sunlu-abs-hs-schwarz': ['50 °C · Gerät und Dauer für ABS HS nicht angegeben']
 };
+function addStockSection(card, profile) {
+  const section = element('details','');
+  const summary = element('summary','');
+  const entries = element('div','');
+  const feedback = element('p','');
+  feedback.setAttribute('role','status');
+  const storageKey = 'filament-bestand:' + card.id;
+  const packaging = {unknown:'Unbekannt',sealed:'Originalverpackt',opened:'Angebrochen'};
+  const initial = [{id:'erste-rolle',packaging:'unknown',weight:''}];
+  function readStock() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey));
+      if (Array.isArray(saved)) return saved;
+    } catch {}
+    return initial;
+  }
+  function saveStock(next) {
+    try { localStorage.setItem(storageKey,JSON.stringify(next)); }
+    catch { feedback.textContent = 'Der Bestand konnte in diesem Browser nicht gespeichert werden.'; return; }
+    renderStock(next);
+    feedback.textContent = 'Bestand gespeichert.';
+  }
+  function stockForm(roll, index) {
+    const editor = element('form','');
+    if (roll) editor.append(element('strong','Rolle ' + (index + 1)));
+    const fields = element('div','');
+    fields.className = 'fields';
+    const conditionLabel = element('label','Verpackungsstatus');
+    const condition = element('select','');
+    for (const [value,label] of Object.entries(packaging)) condition.add(new Option(label,value));
+    condition.value = roll?.packaging ?? 'sealed';
+    conditionLabel.append(condition);
+    const weightLabel = element('label','Restgewicht in Gramm (optional)');
+    const weight = element('input','');
+    weight.type = 'number';
+    weight.min = '1';
+    weight.step = 'any';
+    weight.inputMode = 'decimal';
+    weight.value = roll?.weight ?? '';
+    weightLabel.append(weight);
+    fields.append(conditionLabel,weightLabel);
+    const save = element('button',roll ? 'Rolle speichern' : 'Rolle hinzufügen');
+    editor.append(fields,save);
+    editor.onsubmit = event => {
+      event.preventDefault();
+      const stock = readStock();
+      const updated = {id:roll?.id ?? crypto.randomUUID(),packaging:condition.value,weight:weight.value};
+      saveStock(roll ? stock.map(item=>item.id===roll.id ? updated : item) : [...stock,updated]);
+    };
+    if (roll) {
+      const remove = element('button','Rolle aufgebraucht');
+      remove.type = 'button';
+      remove.style.marginInlineStart = '.5rem';
+      remove.onclick = () => saveStock(readStock().filter(item=>item.id!==roll.id));
+      editor.append(remove);
+    }
+    return editor;
+  }
+  function renderStock(stock) {
+    const parts = ['Bestand: ' + stock.length + (stock.length===1 ? ' Rolle' : ' Rollen')];
+    for (const [status,label] of [['sealed','originalverpackt'],['opened','angebrochen']]) {
+      const count = stock.filter(item=>item.packaging===status).length;
+      if (count) parts.push(count + ' ' + label);
+    }
+    const weighed = stock.filter(item=>item.packaging==='opened'&&item.weight!=='');
+    if (weighed.length) {
+      const grams = weighed.reduce((total,item)=>total+Number(item.weight),0);
+      parts.push(grams.toLocaleString('de-DE')+' g erfasster Rest');
+    }
+    summary.textContent = parts.join(' · ');
+    entries.replaceChildren(...stock.map(stockForm),stockForm(null));
+  }
+  section.append(summary,element('p','Der Bestand wird in diesem Browser gespeichert. Trage das Restgewicht ohne Spule ein.'),entries,feedback);
+  profile.after(section);
+  renderStock(readStock());
+}
 function prepareCard(card, color) {
   const title = card.querySelector('h2').textContent;
   card.dataset.material = title.match(/Stützmaterial|PLA\+|PETG|ABS|PLA/i)?.[0] ?? title;
@@ -290,6 +366,7 @@ function prepareCard(card, color) {
   swatch.style.setProperty('--swatch', colors[color] ?? 'transparent');
   swatch.setAttribute('aria-hidden','true');
   const label = card.querySelector('.label');
+  label.textContent = color;
   const heading = card.querySelector('h2');
   const cardHeading = element('div','');
   cardHeading.className = 'card-heading';
@@ -346,6 +423,7 @@ function prepareCard(card, color) {
   };
   profile.append(editor);
   cardHeading.after(profile);
+  addStockSection(card,profile);
 }
 function addQr(card, packed) {
   const qr = element('details','');
