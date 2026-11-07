@@ -293,8 +293,19 @@ function prepareCard(card, color) {
   const fields = element('div','');
   fields.className = 'fields';
   const profileKey = 'filament-x2d:' + card.id;
-  let saved = {};
-  try { saved = JSON.parse(localStorage.getItem(profileKey)) ?? {}; } catch {}
+  const nozzleLabel = element('label','Düse');
+  const nozzle = element('select','');
+  nozzle.append(new Option('Hauptdüse','main'),new Option('Nebendüse','secondary'));
+  nozzleLabel.append(nozzle);
+  editor.append(nozzleLabel);
+  const profileKeys = {main:profileKey,secondary:profileKey + ':secondary'};
+  const drafts = {};
+  let activeNozzle = 'main';
+  function readProfile() {
+    try { return JSON.parse(localStorage.getItem(profileKeys[activeNozzle])) ?? {}; }
+    catch { return {}; }
+  }
+  const saved = readProfile();
   for (const [name,label] of Object.entries({duese:'Düsentemperatur (°C)',platte:'Druckplatte',bett:'Druckbett (°C)',fluss:'Maximaler Volumenstrom (mm³/s)',notiz:'Notizen'})) {
     const field = element('label',label);
     const input = element('input','');
@@ -307,9 +318,16 @@ function prepareCard(card, color) {
   const message = element('p','');
   message.setAttribute('role','status');
   editor.append(fields,element('button','Druckwerte speichern'),message);
+  nozzle.onchange = () => {
+    drafts[activeNozzle] = Object.fromEntries(new FormData(editor));
+    activeNozzle = nozzle.value;
+    const values = drafts[activeNozzle] ?? readProfile();
+    for (const input of fields.querySelectorAll('input')) input.value = values[input.name] ?? '';
+    message.textContent = '';
+  };
   editor.onsubmit = event => {
     event.preventDefault();
-    try { localStorage.setItem(profileKey,JSON.stringify(Object.fromEntries(new FormData(editor)))); message.textContent = 'Druckwerte gespeichert.'; }
+    try { localStorage.setItem(profileKeys[activeNozzle],JSON.stringify(Object.fromEntries(new FormData(editor)))); message.textContent = 'Druckwerte gespeichert.'; }
     catch { message.textContent = 'Speichern in diesem Browser fehlgeschlagen.'; }
   };
   profile.append(editor);
