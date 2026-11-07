@@ -294,7 +294,7 @@ function addStockSection(card, profile) {
   tareSaved.hidden = true;
   tareRow.append(tareLabel,tareSave,tareSaved);
   tareForm.append(tareRow);
-  tareInput.oninput = () => {
+  tareInput.oninput = tareInput.onchange = () => {
     tareSave.hidden = tareSave.disabled = tareInput.value === defaultTare;
     tareSaved.hidden = true;
   };
@@ -499,19 +499,40 @@ function prepareCard(card, color) {
   }
   const message = element('p','');
   message.setAttribute('role','status');
-  editor.append(fields,element('button','Druckwerte speichern'),message);
+  const save = element('button','Änderung speichern');
+  editor.append(fields,save,message);
+  let baseline = saved;
+  const inputs = [...fields.querySelectorAll('input')];
+  function updateSaveButton() {
+    const changed = inputs.some(input=>input.value!==(baseline[input.name] ?? ''));
+    save.hidden = save.disabled = !changed;
+  }
+  function onProfileEdit() {
+    message.textContent = '';
+    updateSaveButton();
+  }
+  editor.addEventListener('input',onProfileEdit);
+  editor.addEventListener('change',onProfileEdit);
   nozzle.onchange = () => {
     drafts[activeNozzle] = Object.fromEntries(new FormData(editor));
     activeNozzle = nozzle.value;
-    const values = drafts[activeNozzle] ?? readProfile();
-    for (const input of fields.querySelectorAll('input')) input.value = values[input.name] ?? '';
-    message.textContent = '';
+    baseline = readProfile();
+    const values = drafts[activeNozzle] ?? baseline;
+    for (const input of inputs) input.value = values[input.name] ?? '';
+    onProfileEdit();
   };
   editor.onsubmit = event => {
     event.preventDefault();
-    try { localStorage.setItem(profileKeys[activeNozzle],JSON.stringify(Object.fromEntries(new FormData(editor)))); message.textContent = 'Druckwerte gespeichert.'; }
-    catch { message.textContent = 'Speichern in diesem Browser fehlgeschlagen.'; }
+    if (save.disabled) return;
+    const values = Object.fromEntries(new FormData(editor));
+    try {
+      localStorage.setItem(profileKeys[activeNozzle],JSON.stringify(values));
+      baseline = values;
+      updateSaveButton();
+      message.textContent = 'Gespeichert';
+    } catch { message.textContent = 'Speichern in diesem Browser fehlgeschlagen.'; }
   };
+  updateSaveButton();
   profile.append(editor);
   cardHeading.after(profile);
   addStockSection(card,profile);
