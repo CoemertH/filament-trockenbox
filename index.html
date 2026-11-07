@@ -11,6 +11,7 @@ article:target > .open-roll{display:none}
 .stock-weight-save{grid-column:1/-1;display:flex;gap:.55rem;align-items:flex-end}.stock-weight-save label{flex:1;min-width:0}.stock-weight-save button{flex:0 0 auto;margin:0;border-radius:.35rem;padding:.65rem .75rem;max-width:48%}
 .stock-weight-save > [role=status]{padding:.65rem .75rem;color:var(--mint);border:1px solid #58716e;border-radius:.35rem}
 .profile-save-row{grid-column:auto;min-width:0;flex-wrap:wrap}.profile-save-row label{flex:1 1 8rem}.profile-save-row button{max-width:100%}.profile-save-row p{margin:0}
+.location-panel{margin-top:.6rem}.location-layout{display:flex;align-items:flex-start;gap:.6rem;flex-wrap:wrap}.location-layout>div{flex:1 1 13rem;min-width:0}.location-layout>button{margin:0}.location-form{padding:.6rem;margin:0 0 .5rem}.location-manager{margin-top:.75rem}.location-manager h3{margin:0 0 .5rem}
 </style>
 <main>
 <header><span class="label">Filamentlager</span><h1>Filament Bestand</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -267,6 +268,136 @@ const dryingByDevice = {
   'bambu-lab-pla-basic-beige': ['Umluft-Trockenschrank · 50 °C · 8 Stunden (Datenblatt und englischer EU-Shop)', 'AMS 2 Pro oder AMS HT · 55 °C · 8 Stunden', 'Umluft-Trockenschrank · 55 °C · 8 Stunden (französischer EU-Shop)'],
   'sunlu-abs-hs-schwarz': ['50 °C · Gerät und Dauer für ABS HS nicht angegeben']
 };
+const locationKey = 'filament-lagerorte';
+function readLocations() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(locationKey));
+    if (Array.isArray(saved)) return saved;
+  } catch {}
+  return [];
+}
+function addLocationSection(card, readStock, saveStock) {
+  const details = element('details','');
+  details.className = 'locations';
+  const summary = element('summary','');
+  const panel = element('div','');
+  panel.className = 'location-panel';
+  const layout = element('div','');
+  layout.className = 'location-layout';
+  const assignments = element('div','');
+  const manage = element('button','Lagerorte bearbeiten/hinzufügen');
+  manage.type = 'button';
+  manage.setAttribute('aria-expanded','false');
+  const manager = element('div','');
+  manager.className = 'location-manager';
+  manager.hidden = true;
+  const feedback = element('p','');
+  feedback.setAttribute('role','status');
+  layout.append(assignments,manage);
+  panel.append(layout,manager,feedback);
+  details.append(summary,panel);
+  function refreshAssignments() {
+    const stock = readStock();
+    const locations = readLocations();
+    const names = new Map(locations.map(item=>[item.id,item.name]));
+    const assigned = [...new Set(stock.map(roll=>names.get(roll.locationId) ?? 'Nicht angegeben'))];
+    summary.textContent = 'Lagerort: ' + (assigned.length ? assigned.join(' · ') : 'Keine Rollen im Bestand');
+    assignments.replaceChildren();
+    if (!stock.length) assignments.append(element('p','Sobald eine Rolle im Bestand ist, kannst du ihr einen Lagerort zuweisen.'));
+    stock.forEach((roll,index) => {
+      const editor = element('form','');
+      editor.className = 'location-form';
+      const row = element('div','');
+      row.className = 'stock-weight-save';
+      const label = element('label',stock.length===1 ? 'Lagerort auswählen' : 'Lagerort für Rolle '+(index+1));
+      const select = element('select','');
+      select.add(new Option('Nicht angegeben',''));
+      for (const place of locations) select.add(new Option(place.name,place.id));
+      const previous = names.has(roll.locationId) ? roll.locationId : '';
+      select.value = previous;
+      label.append(select);
+      const save = element('button','Änderung speichern');
+      save.hidden = save.disabled = true;
+      select.onchange = () => {
+        save.hidden = save.disabled = select.value===previous;
+        feedback.textContent = '';
+      };
+      editor.onsubmit = event => {
+        event.preventDefault();
+        if (save.disabled) return;
+        const current = readStock();
+        if (!current.some(item=>item.id===roll.id)) { refreshAssignments(); return; }
+        if (saveStock(current.map(item=>item.id===roll.id ? {...item,locationId:select.value} : item))) feedback.textContent = 'Gespeichert';
+        else feedback.textContent = 'Der Lagerort konnte nicht gespeichert werden.';
+      };
+      row.append(label,save);
+      editor.append(row);
+      assignments.append(editor);
+    });
+  }
+  function renderManager() {
+    const places = readLocations();
+    manager.replaceChildren(element('h3','Deine Lagerorte'));
+    if (!places.length) manager.append(element('p','Du hast noch keine Lagerorte angelegt.'));
+    for (const place of places) manager.append(locationForm(place));
+    const create = element('button','Lagerort erstellen');
+    create.type = 'button';
+    create.onclick = () => {
+      const editor = locationForm(null);
+      create.replaceWith(editor);
+      editor.querySelector('input').focus();
+    };
+    manager.append(create);
+  }
+  function locationForm(place) {
+    const editor = element('form','');
+    editor.className = 'location-form';
+    const row = element('div','');
+    row.className = 'stock-weight-save';
+    const label = element('label',place ? 'Lagerort umbenennen' : 'Name des neuen Lagerorts');
+    const input = element('input','');
+    input.required = true;
+    input.maxLength = 60;
+    input.value = place?.name ?? '';
+    label.append(input);
+    const save = element('button',place ? 'Änderung speichern' : 'Lagerort hinzufügen');
+    save.hidden = save.disabled = true;
+    input.oninput = () => {
+      const name = input.value.trim();
+      save.hidden = save.disabled = !name || name===place?.name;
+      feedback.textContent = '';
+    };
+    editor.onsubmit = event => {
+      event.preventDefault();
+      if (save.disabled) return;
+      const name = input.value.trim();
+      const places = readLocations();
+      if (places.some(item=>item.id!==place?.id && item.name.normalize('NFKC').toLocaleLowerCase('de')===name.normalize('NFKC').toLocaleLowerCase('de'))) {
+        feedback.textContent = 'Diesen Lagerort gibt es bereits.';
+        return;
+      }
+      const next = place ? places.map(item=>item.id===place.id ? {...item,name} : item) : [...places,{id:crypto.randomUUID(),name}];
+      try { localStorage.setItem(locationKey,JSON.stringify(next)); }
+      catch { feedback.textContent = 'Der Lagerort konnte nicht gespeichert werden.'; return; }
+      for (const currentCard of cards.children) currentCard.dispatchEvent(new Event('locations-changed'));
+      feedback.textContent = 'Gespeichert';
+    };
+    row.append(label,save);
+    editor.append(row);
+    return editor;
+  }
+  manage.onclick = () => {
+    manager.hidden = !manager.hidden;
+    manage.setAttribute('aria-expanded',String(!manager.hidden));
+    if (!manager.hidden) renderManager();
+  };
+  card.addEventListener('locations-changed',() => {
+    refreshAssignments();
+    if (!manager.hidden) renderManager();
+  });
+  refreshAssignments();
+  return {details,refreshAssignments};
+}
 function addStockSection(card, profile) {
   const section = element('details','');
   section.className = 'stock';
@@ -328,6 +459,7 @@ function addStockSection(card, profile) {
     try { localStorage.setItem(storageKey,JSON.stringify(next)); }
     catch { feedback.textContent = 'Der Bestand konnte in diesem Browser nicht gespeichert werden.'; return; }
     renderStock(next,savedRollId);
+    location.refreshAssignments();
     filter();
     feedback.textContent = 'Bestand gespeichert.';
     return true;
@@ -402,7 +534,7 @@ function addStockSection(card, profile) {
       event.preventDefault();
       if (roll && save.hidden) return;
       const stock = readStock();
-      const updated = {id:roll?.id ?? crypto.randomUUID(),packaging:condition.value,weight:weight.value,gross:gross.value,tare:empty.value};
+      const updated = {...stock.find(item=>item.id===roll?.id),id:roll?.id ?? crypto.randomUUID(),packaging:condition.value,weight:weight.value,gross:gross.value,tare:empty.value};
       saveStock(roll ? stock.map(item=>item.id===roll.id ? updated : item) : [...stock,updated],roll?.id);
     };
     if (roll) {
@@ -446,7 +578,8 @@ function addStockSection(card, profile) {
     feedback.textContent = 'Rolle wieder zum Bestand hinzugefügt.';
   };
   section.append(summary,element('p','Der Bestand wird in diesem Browser gespeichert. Gib das Restgewicht direkt ein oder wiege die komplette Rolle und trage das Leergewicht ein.'),tareForm,feedback,undo,entries);
-  profile.after(section);
+  const location = addLocationSection(card,readStock,saveStock);
+  profile.after(location.details,section);
   renderStock(readStock());
 }
 function prepareCard(card, color) {
@@ -752,7 +885,7 @@ let incomingBackup = null;
 const backupPrefixes = ['filament-x2d:','filament-bestand:','filament-spulengewicht:'];
 const localCardPattern = /^eigene-rolle-[a-f0-9-]{36}$/i;
 function personalKey(name) {
-  if (name === key) return true;
+  if (name === key || name === locationKey) return true;
   const prefix = backupPrefixes.find(value=>name.startsWith(value));
   if (!prefix) return false;
   const cardId = name.slice(prefix.length).replace(prefix==='filament-x2d:' ? /:secondary$/ : /$/,'');
@@ -766,11 +899,13 @@ function validateBackup(data) {
     if (!personalKey(name) || !isText(raw)) throw Error();
     if (name.startsWith('filament-spulengewicht:')) { if (!decimal(raw)) throw Error(); continue; }
     const value = JSON.parse(raw);
-    if (name===key) {
+    if (name===locationKey) {
+      if (!Array.isArray(value) || value.some(item=>!item || !isText(item.id) || !isText(item.name) || !item.name.trim() || item.name.length>60) || new Set(value.map(item=>item.id)).size!==value.length) throw Error();
+    } else if (name===key) {
       if (!Array.isArray(value) || value.some(item=>!item || !localCardPattern.test('eigene-rolle-'+item.id) || !isText(item.material) || !item.material.trim() || !isText(item.farbe) || !item.farbe.trim() || Object.values(item).some(field=>!isText(field)))) throw Error();
       if (new Set(value.map(item=>item.id)).size!==value.length) throw Error();
     } else if (name.startsWith('filament-bestand:')) {
-      if (!Array.isArray(value) || value.some(item=>!item || !isText(item.id) || !['unknown','opened','sealed'].includes(item.packaging) || !decimal(item.weight) || !decimal(item.gross??'') || !decimal(item.tare??'') || (item.gross && (!item.tare && item.tare!=='0' || Number(item.gross)<Number(item.tare))))) throw Error();
+      if (!Array.isArray(value) || value.some(item=>!item || !isText(item.id) || !['unknown','opened','sealed'].includes(item.packaging) || !decimal(item.weight) || (item.locationId!==undefined && !isText(item.locationId)) || !decimal(item.gross??'') || !decimal(item.tare??'') || (item.gross && (!item.tare && item.tare!=='0' || Number(item.gross)<Number(item.tare))))) throw Error();
       if (new Set(value.map(item=>item.id)).size!==value.length) throw Error();
     } else if (!value || typeof value!=='object' || Array.isArray(value) || Object.values(value).some(field=>!isText(field))) throw Error();
   }
@@ -780,7 +915,7 @@ function backupPlan(records) {
   const changes = [];
   for (const [name,value] of Object.entries(records)) {
     const before = localStorage.getItem(name);
-    if (name!==key) {
+    if (name!==key && name!==locationKey) {
       if (before!==value) changes.push({name,before,value,conflict:before!==null});
       continue;
     }
@@ -828,13 +963,14 @@ document.querySelector('#backup-import').onclick = () => {
   const written = [];
   try {
     const plan = backupPlan(incomingBackup).filter(item=>!item.conflict || backupConflict.value==='replace');
-    const writes = plan.filter(item=>item.name!==key);
-    const importedCards = plan.filter(item=>item.name===key);
-    if (importedCards.length) {
-      const before = localStorage.getItem(key);
+    const writes = plan.filter(item=>item.name!==key && item.name!==locationKey);
+    for (const name of [key,locationKey]) {
+      const importedItems = plan.filter(item=>item.name===name);
+      if (!importedItems.length) continue;
+      const before = localStorage.getItem(name);
       const merged = new Map(JSON.parse(before??'[]').map(item=>[item.id,item]));
-      for (const item of importedCards) merged.set(item.id,item.value);
-      writes.push({name:key,before,value:JSON.stringify([...merged.values()])});
+      for (const item of importedItems) merged.set(item.id,item.value);
+      writes.push({name,before,value:JSON.stringify([...merged.values()])});
     }
     for (const item of writes) {
       localStorage.setItem(item.name,item.value);
