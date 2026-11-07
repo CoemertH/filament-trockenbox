@@ -306,11 +306,12 @@ function prepareCard(card, color) {
     catch { return {}; }
   }
   const saved = readProfile();
-  for (const [name,label] of Object.entries({duese:'Düsentemperatur (°C)',platte:'Druckplatte',bett:'Druckbett (°C)',fluss:'Maximaler Volumenstrom (mm³/s)',notiz:'Notizen'})) {
+  for (const [name,label] of Object.entries({duese:'Düsentemperatur (°C)',platte:'Druckplatte',bett:'Druckbett (°C)',fluss:'Maximaler Volumenstrom (mm³/s)',kWert:'K-Wert',flussverhaeltnis:'Flussverhältnis',notiz:'Notizen'})) {
     const field = element('label',label);
     const input = element('input','');
     input.name = name;
     input.maxLength = 200;
+    if (name === 'kWert' || name === 'flussverhaeltnis') input.inputMode = 'decimal';
     input.value = saved[name] ?? '';
     field.append(input);
     fields.append(field);
@@ -331,7 +332,7 @@ function prepareCard(card, color) {
     catch { message.textContent = 'Speichern in diesem Browser fehlgeschlagen.'; }
   };
   profile.append(editor);
-  card.append(profile);
+  cardHeading.after(profile);
 }
 function addQr(card, packed) {
   const qr = element('details','');
