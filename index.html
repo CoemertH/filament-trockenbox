@@ -2,17 +2,18 @@
 <html lang="de">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Filament-Trockenbox</title>
+<title>Filament Bestand</title>
 <style>
 :root{color-scheme:dark;font:16px/1.5 system-ui,sans-serif;background:#10161c;color:#f2f7f6;--mint:#a4f4ce;--muted:#b0c2c7}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top right,#20443d,transparent 55%);min-height:100vh}main{max-width:54rem;margin:auto;padding:clamp(1rem,5vw,3rem)}header{padding:2rem 0}h1{font-size:clamp(2rem,7vw,4rem);line-height:1.08;margin:.4rem 0}h2{font-size:clamp(1.4rem,5vw,2rem);margin:.25rem 0}.label{font-size:.78rem;text-transform:uppercase;letter-spacing:.15em;color:var(--mint);font-weight:700}p,dt{color:var(--muted)}article,form{background:#18242c;border:1px solid #38514f;border-radius:1.4rem;padding:clamp(1rem,4vw,2rem);margin:1rem 0}article:target{border-color:var(--mint)}dl,.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr));gap:.7rem}dl div{background:#111b21;border-radius:.7rem;padding:.75rem}dt{font-size:.82rem}dd{font-weight:700;margin:.2rem 0 0;overflow-wrap:anywhere}a{color:var(--mint)}input,button{font:inherit;border-radius:.6rem;padding:.65rem .8rem}input{width:100%;background:#111b21;color:inherit;border:1px solid #58716e}button{background:var(--mint);color:#112820;border:0;font-weight:700;cursor:pointer;margin-top:1rem}summary{cursor:pointer;color:var(--mint)}footer{margin:2rem 0;color:var(--muted)}
 [hidden]{display:none!important}select{width:100%;font:inherit;padding:.65rem;border-radius:.6rem;background:#111b21;color:inherit;border:1px solid #58716e}.card-heading{display:flex;align-items:center;gap:1rem}.card-heading-text{min-width:0}.swatch{display:block;flex:none;width:clamp(2.75rem,11vw,3.75rem);aspect-ratio:1;border:2px solid #a6b9bd;border-radius:50%;background:var(--swatch)}.drying{grid-column:1/-1}.drying ul{margin:0;padding-left:1.2rem}article details{margin-top:1rem}article details img{display:block;margin:.8rem 0}#all-rolls{display:inline-block;margin-bottom:.5rem}main:has(#overview[hidden]) header{padding:.6rem 0}main:has(#overview[hidden]) header h1{font-size:1.4rem}main:has(#overview[hidden]) header p{display:none}
 article:target > .open-roll{display:none}
+.available-filter{display:flex;gap:.6rem;align-items:center;margin-top:.75rem}.available-filter input{width:auto}.stock-undo{margin-top:0}
 </style>
 <main>
-<header><span class="label">Filamentlager</span><h1>Filament-Trockenbox</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
+<header><span class="label">Filamentlager</span><h1>Filament Bestand</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
 <a id="all-rolls" href="./" hidden>← Alle Rollen</a>
 <div id="overview"><label for="search">Rollen suchen</label><input id="search" type="search" placeholder="Material oder Farbe">
-<div class="fields" style="margin-top:.75rem"><label>Material<select id="material-filter"></select></label><label>Farbe<select id="color-filter"></select></label></div></div>
+<div class="fields" style="margin-top:.75rem"><label>Material<select id="material-filter"></select></label><label>Farbe<select id="color-filter"></select></label></div><label class="available-filter"><input id="available-only" type="checkbox"> Nur verfügbare Filamente</label></div>
 <section id="cards" aria-label="Filamentrollen">
 <article id="support-pla-petg-schwarz">
   <span class="label">Rolle 01 · Schwarz</span>
@@ -52,18 +53,10 @@ article:target > .open-roll{display:none}
   <p class="product-link"><a href="https://www.sunlu.com/products/256" target="_blank" rel="noopener">Vergleichsprodukt bei SUNLU</a></p>
   <a class="open-roll" href="#petg-matt-gruen-03460604a">Filamentkarte öffnen</a>
 </article>
-<article id="sunlu-pla-plus-weiss">
+<article id="sunlu-pla-plus-weiss" data-product="sunlu-pla-plus">
   <span class="label">Rolle 03 · Weiß</span>
   <h2>SUNLU PLA+</h2>
   <dl>
-    <div><dt>Durchmesser</dt><dd>1,75 mm</dd></div>
-    <div><dt>Filamentgewicht</dt><dd>1 kg</dd></div>
-    <div><dt>Düsentemperatur</dt><dd>195–205 °C bei 50–100 mm/s<br>205–220 °C bei 100–300 mm/s</dd></div>
-    <div><dt>Druckbett</dt><dd>50–60 °C</dd></div>
-    <div><dt>Druckgeschwindigkeit</dt><dd>50–300 mm/s</dd></div>
-    <div><dt>Trocknungstemperatur</dt><dd>50–55 °C</dd></div>
-    <div><dt>Trocknungsdauer</dt><dd>6–8 Stunden</dd></div>
-    <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
     <div><dt>Aufdruck unter dem Barcode</dt><dd>00360720E2</dd></div>
   </dl>
   <p>Druckwerte laut Etikett. Trocknungswerte laut SUNLU-Leitfaden für PLA und PLA+.</p>
@@ -71,18 +64,10 @@ article:target > .open-roll{display:none}
   <p class="product-link"><a href="https://www.sunlu.com/de/products/pla-plus-filament" target="_blank" rel="noopener">Produktseite beim Hersteller</a></p>
   <a class="open-roll" href="#sunlu-pla-plus-weiss">Filamentkarte öffnen</a>
 </article>
-<article id="sunlu-pla-plus-rot">
+<article id="sunlu-pla-plus-rot" data-product="sunlu-pla-plus">
   <span class="label">Rolle 04 · Rot</span>
   <h2>SUNLU PLA+</h2>
   <dl>
-    <div><dt>Durchmesser</dt><dd>1,75 mm</dd></div>
-    <div><dt>Filamentgewicht</dt><dd>1 kg</dd></div>
-    <div><dt>Düsentemperatur</dt><dd>195–205 °C bei 50–100 mm/s<br>205–220 °C bei 100–300 mm/s</dd></div>
-    <div><dt>Druckbett</dt><dd>50–60 °C</dd></div>
-    <div><dt>Druckgeschwindigkeit</dt><dd>50–300 mm/s</dd></div>
-    <div><dt>Trocknungstemperatur</dt><dd>50–55 °C</dd></div>
-    <div><dt>Trocknungsdauer</dt><dd>6–8 Stunden</dd></div>
-    <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
     <div><dt>Aufdruck unter dem Barcode</dt><dd>06160602A</dd></div>
   </dl>
   <p>Druckwerte laut Etikett. Trocknungswerte laut SUNLU-Leitfaden für PLA und PLA+.</p>
@@ -90,18 +75,10 @@ article:target > .open-roll{display:none}
   <p class="product-link"><a href="https://www.sunlu.com/de/products/pla-plus-filament" target="_blank" rel="noopener">Produktseite beim Hersteller</a></p>
   <a class="open-roll" href="#sunlu-pla-plus-rot">Filamentkarte öffnen</a>
 </article>
-<article id="sunlu-petg-matt-orange">
+<article id="sunlu-petg-matt-orange" data-product="sunlu-petg-matt-hs">
   <span class="label">Rolle 05 · Orange</span>
   <h2>SUNLU PETG Matt HS</h2>
   <dl>
-    <div><dt>Durchmesser</dt><dd>1,75 mm</dd></div>
-    <div><dt>Filamentgewicht</dt><dd>1 kg</dd></div>
-    <div><dt>Düsentemperatur</dt><dd>230–240 °C bei 50–100 mm/s<br>240–255 °C bei 100–300 mm/s<br>255–270 °C bei 300–600 mm/s</dd></div>
-    <div><dt>Druckbett</dt><dd>70–80 °C</dd></div>
-    <div><dt>Druckgeschwindigkeit</dt><dd>50–600 mm/s</dd></div>
-    <div><dt>Trocknungstemperatur</dt><dd>65 °C im SUNLU S4 oder E2</dd></div>
-    <div><dt>Trocknungsdauer</dt><dd>Mindestens 8 Stunden</dd></div>
-    <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
     <div><dt>Aufdruck unter dem Barcode</dt><dd>03260606A</dd></div>
   </dl>
   <p>Die Druckwerte stammen vom Etikett dieser Rolle. Die Trocknungsempfehlung gilt für SUNLU S4 und E2.</p>
@@ -109,18 +86,10 @@ article:target > .open-roll{display:none}
   <p class="product-link"><a href="https://www.sunlu.com/products/256" target="_blank" rel="noopener">Produktseite beim Hersteller</a></p>
   <a class="open-roll" href="#sunlu-petg-matt-orange">Filamentkarte öffnen</a>
 </article>
-<article id="sunlu-petg-matt-blau">
+<article id="sunlu-petg-matt-blau" data-product="sunlu-petg-matt-hs">
   <span class="label">Rolle 06 · Blau</span>
   <h2>SUNLU PETG Matt HS</h2>
   <dl>
-    <div><dt>Durchmesser</dt><dd>1,75 mm</dd></div>
-    <div><dt>Filamentgewicht</dt><dd>1 kg</dd></div>
-    <div><dt>Düsentemperatur</dt><dd>230–240 °C bei 50–100 mm/s<br>240–255 °C bei 100–300 mm/s<br>255–270 °C bei 300–600 mm/s</dd></div>
-    <div><dt>Druckbett</dt><dd>70–80 °C</dd></div>
-    <div><dt>Druckgeschwindigkeit</dt><dd>50–600 mm/s</dd></div>
-    <div><dt>Trocknungstemperatur</dt><dd>65 °C im SUNLU S4 oder E2</dd></div>
-    <div><dt>Trocknungsdauer</dt><dd>Mindestens 8 Stunden</dd></div>
-    <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
     <div><dt>Aufdruck unter dem Barcode</dt><dd>03360603A</dd></div>
   </dl>
   <p>Die Druckwerte stammen vom Etikett dieser Rolle. Die Trocknungsempfehlung gilt für SUNLU S4 und E2.</p>
@@ -128,18 +97,10 @@ article:target > .open-roll{display:none}
   <p class="product-link"><a href="https://www.sunlu.com/products/256" target="_blank" rel="noopener">Produktseite beim Hersteller</a></p>
   <a class="open-roll" href="#sunlu-petg-matt-blau">Filamentkarte öffnen</a>
 </article>
-<article id="sunlu-pla-plus-schwarz">
+<article id="sunlu-pla-plus-schwarz" data-product="sunlu-pla-plus">
   <span class="label">Rolle 07 · Schwarz</span>
   <h2>SUNLU PLA+</h2>
   <dl>
-    <div><dt>Durchmesser</dt><dd>1,75 mm</dd></div>
-    <div><dt>Filamentgewicht</dt><dd>1 kg</dd></div>
-    <div><dt>Düsentemperatur</dt><dd>195–205 °C bei 50–100 mm/s<br>205–220 °C bei 100–300 mm/s</dd></div>
-    <div><dt>Druckbett</dt><dd>50–60 °C</dd></div>
-    <div><dt>Druckgeschwindigkeit</dt><dd>50–300 mm/s</dd></div>
-    <div><dt>Trocknungstemperatur</dt><dd>50–55 °C</dd></div>
-    <div><dt>Trocknungsdauer</dt><dd>6–8 Stunden</dd></div>
-    <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
     <div><dt>Aufdruck unter dem Barcode</dt><dd>01260701E</dd></div>
   </dl>
   <p>Druckwerte laut Etikett. Trocknungswerte laut SUNLU-Leitfaden für PLA und PLA+.</p>
@@ -147,18 +108,10 @@ article:target > .open-roll{display:none}
   <p class="product-link"><a href="https://www.sunlu.com/de/products/pla-plus-filament" target="_blank" rel="noopener">Produktseite beim Hersteller</a></p>
   <a class="open-roll" href="#sunlu-pla-plus-schwarz">Filamentkarte öffnen</a>
 </article>
-<article id="sunlu-pla-plus-klein-blau">
+<article id="sunlu-pla-plus-klein-blau" data-product="sunlu-pla-plus">
   <span class="label">Rolle 08 · Klein-Blau</span>
   <h2>SUNLU PLA+</h2>
   <dl>
-    <div><dt>Durchmesser</dt><dd>1,75 mm</dd></div>
-    <div><dt>Filamentgewicht</dt><dd>1 kg</dd></div>
-    <div><dt>Düsentemperatur</dt><dd>195–205 °C bei 50–100 mm/s<br>205–220 °C bei 100–300 mm/s</dd></div>
-    <div><dt>Druckbett</dt><dd>50–60 °C</dd></div>
-    <div><dt>Druckgeschwindigkeit</dt><dd>50–300 mm/s</dd></div>
-    <div><dt>Trocknungstemperatur</dt><dd>50–55 °C</dd></div>
-    <div><dt>Trocknungsdauer</dt><dd>6–8 Stunden</dd></div>
-    <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
     <div><dt>Aufdruck unter dem Barcode</dt><dd>00660419Y2</dd></div>
   </dl>
   <p>Druckwerte laut Etikett. Trocknungswerte laut SUNLU-Leitfaden für PLA und PLA+.</p>
@@ -244,10 +197,39 @@ article:target > .open-roll{display:none}
 </article>
 </section>
 <p id="empty" hidden>Keine passende Rolle gefunden.</p>
-<details><summary>Eigene Rolle hinzufügen oder bearbeiten</summary>
-<form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Material<input name="material" required maxlength="100"></label><label>Farbe<input name="farbe" required maxlength="60"></label><label>Durchmesser<input name="durchmesser" required placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" required placeholder="500 g"></label><label>Drucktemperatur<input name="druck" required placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" required placeholder="70 °C · 8 Stunden"></label></div><button>Rolle speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
+<details><summary>Neues Filament anlegen oder bearbeiten</summary>
+<form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Material<input name="material" required maxlength="100"></label><label>Farbe<input name="farbe" required maxlength="60"></label><label>Durchmesser<input name="durchmesser" placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" placeholder="500 g"></label><label>Drucktemperatur<input name="druck" placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" placeholder="70 °C · 8 Stunden"></label></div><button>Filamentkarte speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
+<details id="backup"><summary>Datensicherung</summary>
+<p>Sichere eigene Filamentkarten, X2D-Druckwerte, Bestände und Leergewichte. Die Datei kannst du auch in einem anderen Browser importieren.</p>
+<button id="backup-export" type="button">Sicherung exportieren</button>
+<label>Sicherung auswählen<input id="backup-file" type="file" accept=".json,application/json"></label>
+<p id="backup-status" role="status"></p>
+<div id="backup-preview" hidden>
+<label>Bei Konflikten<select id="backup-conflict"><option value="keep">Vorhandene Daten behalten</option><option value="replace">Werte aus der Sicherung übernehmen</option></select></label>
+<button id="backup-import" type="button">Sicherung importieren</button>
+</div></details>
 <footer>Filamentlager · Bambu Lab X2D</footer>
 </main>
+<template id="specs-sunlu-pla-plus">
+    <div><dt>Durchmesser</dt><dd>1,75 mm</dd></div>
+    <div><dt>Filamentgewicht</dt><dd>1 kg</dd></div>
+    <div><dt>Düsentemperatur</dt><dd>195–205 °C bei 50–100 mm/s<br>205–220 °C bei 100–300 mm/s</dd></div>
+    <div><dt>Druckbett</dt><dd>50–60 °C</dd></div>
+    <div><dt>Druckgeschwindigkeit</dt><dd>50–300 mm/s</dd></div>
+    <div><dt>Trocknungstemperatur</dt><dd>50–55 °C</dd></div>
+    <div><dt>Trocknungsdauer</dt><dd>6–8 Stunden</dd></div>
+    <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
+</template>
+<template id="specs-sunlu-petg-matt-hs">
+    <div><dt>Durchmesser</dt><dd>1,75 mm</dd></div>
+    <div><dt>Filamentgewicht</dt><dd>1 kg</dd></div>
+    <div><dt>Düsentemperatur</dt><dd>230–240 °C bei 50–100 mm/s<br>240–255 °C bei 100–300 mm/s<br>255–270 °C bei 300–600 mm/s</dd></div>
+    <div><dt>Druckbett</dt><dd>70–80 °C</dd></div>
+    <div><dt>Druckgeschwindigkeit</dt><dd>50–600 mm/s</dd></div>
+    <div><dt>Trocknungstemperatur</dt><dd>65 °C im SUNLU S4 oder E2</dd></div>
+    <div><dt>Trocknungsdauer</dt><dd>Mindestens 8 Stunden</dd></div>
+    <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
+</template>
 <script>
 const cards = document.querySelector('#cards');
 const search = document.querySelector('#search');
@@ -268,6 +250,7 @@ function element(tag, content) {
 const materialFilter = document.querySelector('#material-filter');
 const colorFilter = document.querySelector('#color-filter');
 const overview = document.querySelector('#overview');
+const availableOnly = document.querySelector('#available-only');
 const back = document.querySelector('#all-rolls');
 const qrCodes = {"support-pla-petg-schwarz":"/uaaI/wWnoMQbrZtdLt0mZn126sBAq7BOQXFB/qqqq/gB54pAJ/NEZy5qXUrrqnv9tWqONXxEPg5WrkwtDzQ3GKIXOPr8q2wM2xLenNbOo6QMag2n7REOsqXNJkX720afGySqZhQnk4U5S2utCA+12dZmgRkAZ2nPePAF6codWYNWWJxtf8AcK0UW/rd7yowWzIbE7qIob+d17Bo8W6Oi2MrBKLiLf/p6JjQgA==","petg-matt-gruen-03460604a":"/jdry/wRQqTQbrUvhrt11qWF264J0K7BdJV5B/qqqq/gE1GnAL4gKXPjbFwfCbzXApyOMWFPOhQthg/rlB5+xIBb1zNffzcNsLADGpB7q6LrXUuAs2S9V4tOPXqTstUv7g7eToQhPC6o922RQIfw6skgfrVl/D5JL/QCh49R4UhsuOUkN/4AQ26cY/hPEqrwWR2VG7qSkf+91rncNm68eSoPBB5eOR/vVD5rgA==","sunlu-pla-plus-weiss":"/qGYA/wUwoNQbr5NdLt0tJn126kxQq7BCAfFB/qqqq/gCj5tAJ/VFzy5jdU7zoCO9teLiBHzE/Urmqkw0FDS3GC4JOPz/Cgw92z6ynfSOqHQMYgfyrRGOhsTNJkUu40KfFZ1qZhSLZ4UbSUKNCR+RnNfngSIgZjHMsfAF6cKhWYdWSixtf6AWa8UW/qN5qowUXKbE7rYrR+d1xB58W6LiUMrBIbCIf/uyYiwgA==","sunlu-pla-plus-rot":"/twbA/wVNo9QbrUtVLt0U5v126kJQq7BK8XFB/qqqq/gCX5tAJ+2F7y8CdUnzobqdveLKI3yE/VsGrkwrPHS3GN4POPz4r9w92zC0HdSPEEwMYgVwrRGOotXNpkbsK0afFLkqZhTqlYUbSyb9CR+okFfngep8ZjHNcXAN6dAHWcdSaZRtf+AUK8UW/pl5qowULKbE7qCrR+d1ZB58W6PCUMrBArCIf/siYiwgA==","sunlu-petg-matt-orange":"/l9BQ/wQ7mDQbqjJort1eIWl26o9lK7BYKVZB/qqqq/gEC2nAL4Tg/Pk4JlKSY2VZLyv6KZ/OxawFw/rrGxe5IKLzqrXf5FB9HAiMDp+qS7eCGu41oKfVlL5DnqYvAQ/7kSdboQjH/84f2aSDMfwVvuE87QsiWtJKpLkhe8oCnhsibl1N/+Ac0ycY/kGiqrwUNERG7qcP/+91dwNNm62GyoPBLFMGR/oxC5rgA==","sunlu-petg-matt-blau":"/iZDQ/wSvmDQbrNport1UYWl26wV1K7BQedZB/qqqq/gGl3nAL5dhfPi7klKSYXKZLyv0sJ8OxPg9x/r7LNc5ICsLqrXcjRBNHCWnj7+qMIOCGuEwQK/VrqtD3qQOcQv7koGboQhn9cwf24IzMfw84mE87UHaXtJKM7khe96cnhsmXCVN/+AQUycY/hGiqrwUZERG7rWP/+91UwNNm6tGyoPBHVMGR/tpC5rgA==","sunlu-pla-plus-schwarz":"/mRBa/wQJmDQbqqpxrt1eoWF26490K7BU6ZJB/qqqq/gGG3jAL4Rg3Pk6ZlaCYnXZL6vq7Z9KxagFx/rrGxe5ICLRqLXb5EBsHA+2jr2qgOOGWu4koKdVhHpD3qavQQu7kS/bIQiH+8g/3eaTIfwnruE87WlmWtJItTkhe9LOntsibl1J/+Ac0ycY/kWiyrwUBEVG7qQP1+91RwINm60GwoPBLFMGR/oxD5rgA==","sunlu-pla-plus-klein-blau":"/hxpa/wRQqDQbrVPprt19qeF26oJkK7BRJVJB/qqqq/gH9GjAL5iKfPiZVwKCbjRAp6uUEFMKxY8hg/rlBx85IF7xzrXd7ON8HBLvpL2qIr7SWuEt2S9V8hePHqTo9U+7g7+ToQhPb6g/3QRgIfw+iEi87flPCtJJ/QChe8RwVtsuPUkN/4AYWycY/hfGyrwVR2VG7qQm9+91unINm68ewoPBA5MGR/vVD5rgA==","bambu-lab-pla-matt-grau":"/rayA/wTj4RQbq85XLt0YO6l26V8Zi7BUEcBB/qqqq/gAaVxAKNE8JkqbOU6m8rGtGeiuHMFL4i1y7kwuKvsraTqFE95vhZpInkjEEkbH+5ibPnGmlJkOtEsdUwOqZiZNTKk3M0GuZXdyb6qpFW5o3nxPwGFRR7beaW0XsJg+wBYPL1pkPyAXvz0R/scdyowRzlHErpeTp+N0MBspC6vy9FjBHw1HY/ueIi0gA==","sunlu-abs-hs-schwarz":"/iVDS/wStmTQbrVp5rt1c4WF26hVlK7BYORJB/qqqq/gEt2jAL51hXPj4hlLCYmsZJ6vkPJ9CxPx9w/r7LNcxIGNtqtXajTBNHCaWj7eqGJeCGuAgQKdVtqNDkqQKMQv7g4kbqQhvk8w/2cEjMfwJweEc7UH6XtJKI7kp+97cnlsmWCVN/+AYUycY/lGiyrwWdEVG7raP/+91RwINm6pGwoPBGVPOR/spC5rgA==","bambu-lab-pla-basic-beige":"/hZp6/wRiqDQbrVv5rt19KWF264JkK7BVJdJB/qqqq/gE9HjAL4kK/Pi4QwKCbDVApzOc2FNCxQthh/rlBx+5IF6XyLPZzuNsDCLNJL2qaMrSGuI1WSfV8peP2iTo9Uv7gr+ToQjDLa4f20RQMfwqkMiUrbh/CpJL5ACha9R8Vl8uvQkJv4AQWy8Y/nfEqrwVd3VG7rWk/+912nINm68eyoPBD5/OR/uVC5vgA==","bambu-lab-pla-matt-marineblau":"/sfFG/wQloNQbo3xZLt1SUCV26xoV67BZolxB/qqqq/gHb2SAIvuP4fJxPUth53GuF9B0fibF2Y3lsj3lIHw3GCsTLz3lIaRgfeyr44HbiUjO+WRothc2Iov63ThIEXo8jg3wLzDKi0uR4SVnPY3BuI+I3ZolAnHCYY6ZiBxYJ5gzb5V4fsAeeKEQ/uEnKoQQoGlHLrrj4/90kEruG6LwemBBDe7JW/sBPlzgA=="};
 const colors = {Schwarz:'#131313',Weiß:'#fff',Rot:'#d23936',Grün:'#38a55a',Orange:'#f88733',Blau:'#355fe6','Klein-Blau':'#1729ab',Grau:'#9b9ea0',Beige:'#f7e6de',Marineblau:'#0078bf'};
@@ -283,11 +266,37 @@ const dryingByDevice = {
 };
 function addStockSection(card, profile) {
   const section = element('details','');
+  section.className = 'stock';
   const summary = element('summary','');
   const entries = element('div','');
   const feedback = element('p','');
   feedback.setAttribute('role','status');
   const storageKey = 'filament-bestand:' + card.id;
+  const tareKey = 'filament-spulengewicht:' + card.id;
+  let defaultTare = '';
+  try { defaultTare = localStorage.getItem(tareKey) ?? ''; } catch {}
+  const tareForm = element('form','');
+  const tareLabel = element('label','Standard-Leergewicht der Spule (g)');
+  const tareInput = element('input','');
+  tareInput.type = 'number';
+  tareInput.min = '0';
+  tareInput.step = 'any';
+  tareInput.value = defaultTare;
+  tareLabel.append(tareInput);
+  tareForm.append(tareLabel,element('button','Leergewicht speichern'));
+  tareForm.onsubmit = event => {
+    event.preventDefault();
+    try { localStorage.setItem(tareKey,tareInput.value); }
+    catch { feedback.textContent = 'Das Leergewicht konnte nicht gespeichert werden.'; return; }
+    defaultTare = tareInput.value;
+    renderStock(readStock());
+    feedback.textContent = 'Standard-Leergewicht gespeichert.';
+  };
+  const undo = element('button','Aufbrauchen rückgängig machen');
+  undo.className = 'stock-undo';
+  undo.type = 'button';
+  undo.hidden = true;
+  let removed;
   const packaging = {unknown:'Unbekannt',sealed:'Originalverpackt',opened:'Angebrochen'};
   const initial = [{id:'erste-rolle',packaging:'unknown',weight:''}];
   function readStock() {
@@ -301,7 +310,9 @@ function addStockSection(card, profile) {
     try { localStorage.setItem(storageKey,JSON.stringify(next)); }
     catch { feedback.textContent = 'Der Bestand konnte in diesem Browser nicht gespeichert werden.'; return; }
     renderStock(next);
+    filter();
     feedback.textContent = 'Bestand gespeichert.';
+    return true;
   }
   function stockForm(roll, index) {
     const editor = element('form','');
@@ -316,25 +327,54 @@ function addStockSection(card, profile) {
     const weightLabel = element('label','Restgewicht in Gramm (optional)');
     const weight = element('input','');
     weight.type = 'number';
-    weight.min = '1';
+    weight.min = '0';
     weight.step = 'any';
     weight.inputMode = 'decimal';
     weight.value = roll?.weight ?? '';
     weightLabel.append(weight);
-    fields.append(conditionLabel,weightLabel);
+    const grossLabel = element('label','Gesamtgewicht mit Spule (g)');
+    const gross = weight.cloneNode();
+    gross.value = roll?.gross ?? '';
+    grossLabel.append(gross);
+    const emptyLabel = element('label','Leergewicht dieser Spule (g)');
+    const empty = weight.cloneNode();
+    empty.value = roll?.tare || defaultTare;
+    emptyLabel.append(empty);
+    const manualWeight = weight.value;
+    function updateWeight() {
+      const hasGross = gross.value !== '';
+      weight.readOnly = hasGross;
+      const invalid = hasGross && (empty.value === '' || Number(gross.value) < Number(empty.value));
+      gross.setCustomValidity(invalid ? 'Gib ein Leergewicht ein, das höchstens so groß wie das Gesamtgewicht ist.' : '');
+      if (hasGross) weight.value = invalid ? '' : String(Math.round((Number(gross.value)-Number(empty.value))*1000)/1000);
+    }
+    let manual = manualWeight;
+    weight.oninput = () => { if (!weight.readOnly) manual = weight.value; };
+    gross.oninput = () => { if (gross.value === '') weight.value = manual; updateWeight(); };
+    empty.oninput = updateWeight;
+    updateWeight();
+    fields.append(conditionLabel,grossLabel,emptyLabel,weightLabel);
     const save = element('button',roll ? 'Rolle speichern' : 'Rolle hinzufügen');
     editor.append(fields,save);
     editor.onsubmit = event => {
       event.preventDefault();
       const stock = readStock();
-      const updated = {id:roll?.id ?? crypto.randomUUID(),packaging:condition.value,weight:weight.value};
+      const updated = {id:roll?.id ?? crypto.randomUUID(),packaging:condition.value,weight:weight.value,gross:gross.value,tare:empty.value};
       saveStock(roll ? stock.map(item=>item.id===roll.id ? updated : item) : [...stock,updated]);
     };
     if (roll) {
       const remove = element('button','Rolle aufgebraucht');
       remove.type = 'button';
       remove.style.marginInlineStart = '.5rem';
-      remove.onclick = () => saveStock(readStock().filter(item=>item.id!==roll.id));
+      remove.onclick = () => {
+        const stock = readStock();
+        const current = stock.find(item=>item.id===roll.id);
+        if (!current || !saveStock(stock.filter(item=>item.id!==roll.id))) return;
+        removed = current;
+        undo.hidden = false;
+        if (availableOnly.checked && card.hidden) { availableOnly.checked = false; filter(); }
+        feedback.textContent = 'Rolle als aufgebraucht markiert.';
+      };
       editor.append(remove);
     }
     return editor;
@@ -345,15 +385,24 @@ function addStockSection(card, profile) {
       const count = stock.filter(item=>item.packaging===status).length;
       if (count) parts.push(count + ' ' + label);
     }
-    const weighed = stock.filter(item=>item.packaging==='opened'&&item.weight!=='');
+    const weighed = stock.filter(item=>item.packaging!=='sealed'&&item.weight!=='');
     if (weighed.length) {
       const grams = weighed.reduce((total,item)=>total+Number(item.weight),0);
       parts.push(grams.toLocaleString('de-DE')+' g erfasster Rest');
     }
+    const missing = stock.filter(item=>item.packaging!=='sealed'&&item.weight==='').length;
+    if (missing) parts.push(missing + (missing===1 ? ' Restgewicht offen' : ' Restgewichte offen'));
+    card.dataset.stockCount = String(stock.length);
     summary.textContent = parts.join(' · ');
     entries.replaceChildren(...stock.map(stockForm),stockForm(null));
   }
-  section.append(summary,element('p','Der Bestand wird in diesem Browser gespeichert. Trage das Restgewicht ohne Spule ein.'),entries,feedback);
+  undo.onclick = () => {
+    if (!removed || !saveStock([...readStock(),removed])) return;
+    removed = null;
+    undo.hidden = true;
+    feedback.textContent = 'Rolle wieder zum Bestand hinzugefügt.';
+  };
+  section.append(summary,element('p','Der Bestand wird in diesem Browser gespeichert. Gib das Restgewicht direkt ein oder wiege die komplette Rolle und trage das Leergewicht ein.'),tareForm,feedback,undo,entries);
   profile.after(section);
   renderStock(readStock());
 }
@@ -451,6 +500,8 @@ function addQr(card, packed) {
 for (const card of cards.querySelectorAll('article[id]')) {
   prepareCard(card,card.querySelector('.label').textContent.split(' · ')[1]);
   const specs = card.querySelector('dl');
+  const sharedSpecs = document.getElementById('specs-' + card.dataset.product);
+  if (sharedSpecs) specs.prepend(sharedSpecs.content.cloneNode(true));
   const manufacturer = element('details','');
   manufacturer.append(element('summary','Herstellerangaben'));
   specs.before(manufacturer);
@@ -493,7 +544,20 @@ for (const card of cards.querySelectorAll('article[id]')) {
   const existingDrying = drying.map(field => field.querySelector('dd').textContent).join(' · ');
   const values = dryingByDevice[card.id] ?? [existingDrying + (card.id.startsWith('sunlu-pla-plus-') ? ' · Gerät nicht angegeben' : '')];
   const list = element('ul','');
-  for (const value of values) list.append(element('li',value));
+  const sources = [...manufacturer.querySelectorAll('a[href]')];
+  for (const value of values) {
+    const item = element('li',value);
+    let source = sources[0];
+    if (value.includes('französischer EU-Shop')) source = sources.find(link=>link.pathname.startsWith('/fr/')) ?? source;
+    else if (value.includes('Datenblatt')) source = sources.find(link=>link.pathname.endsWith('.pdf')) ?? source;
+    if (source) {
+      const link = element('a','Quelle');
+      link.href = source.href;
+      link.setAttribute('aria-label','Quelle für '+value);
+      item.append(' · ',link);
+    }
+    list.append(item);
+  }
   drying[0].querySelector('dd').replaceChildren(list);
   drying[0].classList.add('drying');
   drying[1].remove();
@@ -513,14 +577,15 @@ function filter() {
   overview.hidden = Boolean(single);
   back.hidden = !single;
   form.closest('details').hidden = Boolean(single);
+  document.querySelector('#backup').hidden = Boolean(single);
   const query = search.value.trim().toLocaleLowerCase('de');
   for (const card of cards.children) {
     const matches = [...card.querySelectorAll('h2,.label')].some(node => node.textContent.toLocaleLowerCase('de').includes(query));
-    card.hidden = single ? card !== target : !matches || (materialFilter.value && card.dataset.material !== materialFilter.value) || (colorFilter.value && card.dataset.color !== colorFilter.value);
+    card.hidden = single ? card !== target : !matches || (availableOnly.checked && card.dataset.stockCount === '0') || (materialFilter.value && card.dataset.material !== materialFilter.value) || (colorFilter.value && card.dataset.color !== colorFilter.value);
   }
   document.querySelector('#empty').hidden = [...cards.children].some(card => !card.hidden);
 }
-materialFilter.onchange = colorFilter.onchange = filter;
+materialFilter.onchange = colorFilter.onchange = availableOnly.onchange = filter;
 window.addEventListener('hashchange', () => { filter(); window.scrollTo(0,0); });
 function render() {
   cards.querySelectorAll('[data-local]').forEach(card => card.remove());
@@ -533,13 +598,13 @@ function render() {
     const specs = element('dl','');
     for (const [field,title] of Object.entries(labels)) {
       const item = element('div','');
-      item.append(element('dt',title),element('dd',roll[field]));
+      item.append(element('dt',title),element('dd',roll[field] || 'Nicht angegeben'));
       specs.append(item);
     }
     const edit = element('button','Bearbeiten');
     edit.onclick = () => {
       editing = roll.id;
-      for (const field of form.querySelectorAll('input')) field.value = roll[field.name];
+      for (const field of form.querySelectorAll('input')) field.value = roll[field.name] ?? ''; 
       form.closest('details').open = true;
       reset.hidden = false;
       status.textContent = '';
@@ -561,7 +626,24 @@ reset.onclick = () => { clearEditor(); status.textContent = ''; };
 form.onsubmit = event => {
   event.preventDefault();
   const fields = Object.fromEntries([...new FormData(form)].map(([field,value]) => [field,value.trim()]));
-  if (Object.values(fields).some(value => !value)) { status.textContent = 'Bitte alle Felder ausfüllen.'; return; }
+  if (!fields.material || !fields.farbe) { status.textContent = 'Bitte Material und Farbe eintragen.'; return; }
+  const normalize = value => value.normalize('NFKC').trim().toLocaleLowerCase('de').replace(/\s+/g,' ');
+  const duplicate = [...cards.children].find(card => card.id !== 'eigene-rolle-' + editing && normalize(card.querySelector('h2').textContent) === normalize(fields.material) && normalize(card.dataset.color) === normalize(fields.farbe));
+  if (duplicate) {
+    const show = element('button','Rolle zum vorhandenen Bestand hinzufügen');
+    show.type = 'button';
+    show.onclick = () => {
+      search.value = materialFilter.value = colorFilter.value = '';
+      availableOnly.checked = false;
+      filter();
+      const stock = duplicate.querySelector('.stock');
+      stock.open = true;
+      stock.scrollIntoView({block:'start'});
+      stock.querySelector('form:last-child button')?.focus();
+    };
+    status.replaceChildren('Für dieses Filament gibt es bereits eine Karte. ',show);
+    return;
+  }
   const roll = {...fields,id:editing ?? crypto.randomUUID()};
   const next = editing ? rolls.map(item => item.id === editing ? roll : item) : [...rolls,roll];
   try { localStorage.setItem(key,JSON.stringify(next)); } catch { status.textContent = 'Speichern in diesem Browser fehlgeschlagen.'; return; }
@@ -571,6 +653,115 @@ form.onsubmit = event => {
   render();
   status.textContent = 'Rolle gespeichert.';
 };
+
+const backupFile = document.querySelector('#backup-file');
+const backupStatus = document.querySelector('#backup-status');
+const backupPreview = document.querySelector('#backup-preview');
+const backupConflict = document.querySelector('#backup-conflict');
+let incomingBackup = null;
+const backupPrefixes = ['filament-x2d:','filament-bestand:','filament-spulengewicht:'];
+const localCardPattern = /^eigene-rolle-[a-f0-9-]{36}$/i;
+function personalKey(name) {
+  if (name === key) return true;
+  const prefix = backupPrefixes.find(value=>name.startsWith(value));
+  if (!prefix) return false;
+  const cardId = name.slice(prefix.length).replace(prefix==='filament-x2d:' ? /:secondary$/ : /$/,'');
+  return localCardPattern.test(cardId) || [...cards.querySelectorAll('article[id]:not([data-local])')].some(card=>card.id===cardId);
+}
+function validateBackup(data) {
+  if (data?.version!==1 || !data.records || typeof data.records!=='object' || Array.isArray(data.records)) throw Error();
+  const isText = value => typeof value==='string';
+  const decimal = value => isText(value) && (value==='' || (value.trim()!=='' && Number.isFinite(Number(value)) && Number(value)>=0));
+  for (const [name,raw] of Object.entries(data.records)) {
+    if (!personalKey(name) || !isText(raw)) throw Error();
+    if (name.startsWith('filament-spulengewicht:')) { if (!decimal(raw)) throw Error(); continue; }
+    const value = JSON.parse(raw);
+    if (name===key) {
+      if (!Array.isArray(value) || value.some(item=>!item || !localCardPattern.test('eigene-rolle-'+item.id) || !isText(item.material) || !item.material.trim() || !isText(item.farbe) || !item.farbe.trim() || Object.values(item).some(field=>!isText(field)))) throw Error();
+      if (new Set(value.map(item=>item.id)).size!==value.length) throw Error();
+    } else if (name.startsWith('filament-bestand:')) {
+      if (!Array.isArray(value) || value.some(item=>!item || !isText(item.id) || !['unknown','opened','sealed'].includes(item.packaging) || !decimal(item.weight) || !decimal(item.gross??'') || !decimal(item.tare??'') || (item.gross && (!item.tare && item.tare!=='0' || Number(item.gross)<Number(item.tare))))) throw Error();
+      if (new Set(value.map(item=>item.id)).size!==value.length) throw Error();
+    } else if (!value || typeof value!=='object' || Array.isArray(value) || Object.values(value).some(field=>!isText(field))) throw Error();
+  }
+  return data.records;
+}
+function backupPlan(records) {
+  const changes = [];
+  for (const [name,value] of Object.entries(records)) {
+    const before = localStorage.getItem(name);
+    if (name!==key) {
+      if (before!==value) changes.push({name,before,value,conflict:before!==null});
+      continue;
+    }
+    const current = JSON.parse(before??'[]');
+    const imported = JSON.parse(value);
+    const merged = new Map(current.map(item=>[item.id,item]));
+    for (const item of imported) {
+      const previous = merged.get(item.id);
+      if (JSON.stringify(previous)!==JSON.stringify(item)) changes.push({name,id:item.id,value:item,conflict:previous!==undefined});
+    }
+  }
+  return changes;
+}
+document.querySelector('#backup-export').onclick = () => {
+  try {
+    const records = Object.fromEntries(Object.keys(localStorage).filter(personalKey).map(name=>[name,localStorage.getItem(name)]));
+    const url = URL.createObjectURL(new Blob([JSON.stringify({version:1,records},null,2)],{type:'application/json'}));
+    const download = element('a','');
+    download.href = url;
+    download.download = 'Filament-Bestand-Sicherung.json';
+    download.click();
+    setTimeout(()=>URL.revokeObjectURL(url),30000);
+    backupStatus.textContent = 'Sicherungsdatei erstellt.';
+  } catch { backupStatus.textContent = 'Die Sicherung konnte nicht erstellt werden.'; }
+};
+backupFile.onchange = async () => {
+  incomingBackup = null;
+  backupPreview.hidden = true;
+  const file = backupFile.files[0];
+  if (!file) return;
+  try {
+    if (file.size > 2000000) throw Error();
+    const parsed = validateBackup(JSON.parse(await file.text()));
+    if (backupFile.files[0]!==file) return;
+    const plan = backupPlan(parsed);
+    incomingBackup = parsed;
+    const conflicts = plan.filter(item=>item.conflict).length;
+    backupStatus.textContent = plan.length ? 'Vorschau: '+(plan.length-conflicts)+' neue Einträge, '+conflicts+' Konflikte mit vorhandenen Einträgen.' : 'Die Sicherung enthält keine Änderungen.';
+    backupConflict.value = 'keep';
+    backupPreview.hidden = !plan.length;
+  } catch { backupStatus.textContent = 'Die Datei ist keine gültige Sicherung für Filament Bestand.'; }
+};
+document.querySelector('#backup-import').onclick = () => {
+  if (!incomingBackup) return;
+  const written = [];
+  try {
+    const plan = backupPlan(incomingBackup).filter(item=>!item.conflict || backupConflict.value==='replace');
+    const writes = plan.filter(item=>item.name!==key);
+    const importedCards = plan.filter(item=>item.name===key);
+    if (importedCards.length) {
+      const before = localStorage.getItem(key);
+      const merged = new Map(JSON.parse(before??'[]').map(item=>[item.id,item]));
+      for (const item of importedCards) merged.set(item.id,item.value);
+      writes.push({name:key,before,value:JSON.stringify([...merged.values()])});
+    }
+    for (const item of writes) {
+      localStorage.setItem(item.name,item.value);
+      written.push(item);
+    }
+    backupPreview.hidden = true;
+    incomingBackup = null;
+    backupStatus.textContent = 'Sicherung übernommen. Die Seite wird neu geladen.';
+    location.reload();
+  } catch {
+    for (const item of written.reverse()) {
+      try { if (item.before===null) localStorage.removeItem(item.name); else localStorage.setItem(item.name,item.before); } catch {}
+    }
+    backupStatus.textContent = 'Die Sicherung konnte nicht vollständig übernommen werden.';
+  }
+};
+
 search.oninput = filter;
 render();
 </script>
