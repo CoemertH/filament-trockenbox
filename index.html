@@ -5,10 +5,13 @@
 <title>Filament-Trockenbox</title>
 <style>
 :root{color-scheme:dark;font:16px/1.5 system-ui,sans-serif;background:#10161c;color:#f2f7f6;--mint:#a4f4ce;--muted:#b0c2c7}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top right,#20443d,transparent 55%);min-height:100vh}main{max-width:54rem;margin:auto;padding:clamp(1rem,5vw,3rem)}header{padding:2rem 0}h1{font-size:clamp(2rem,7vw,4rem);line-height:1.08;margin:.4rem 0}h2{font-size:clamp(1.4rem,5vw,2rem);margin:.25rem 0}.label{font-size:.78rem;text-transform:uppercase;letter-spacing:.15em;color:var(--mint);font-weight:700}p,dt{color:var(--muted)}article,form{background:#18242c;border:1px solid #38514f;border-radius:1.4rem;padding:clamp(1rem,4vw,2rem);margin:1rem 0}article:target{border-color:var(--mint)}dl,.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr));gap:.7rem}dl div{background:#111b21;border-radius:.7rem;padding:.75rem}dt{font-size:.82rem}dd{font-weight:700;margin:.2rem 0 0;overflow-wrap:anywhere}a{color:var(--mint)}input,button{font:inherit;border-radius:.6rem;padding:.65rem .8rem}input{width:100%;background:#111b21;color:inherit;border:1px solid #58716e}button{background:var(--mint);color:#112820;border:0;font-weight:700;cursor:pointer;margin-top:1rem}summary{cursor:pointer;color:var(--mint)}footer{margin:2rem 0;color:var(--muted)}
+[hidden]{display:none!important}select{width:100%;font:inherit;padding:.65rem;border-radius:.6rem;background:#111b21;color:inherit;border:1px solid #58716e}.swatch{display:inline-block;width:.9rem;height:.9rem;margin-right:.5rem;vertical-align:-.1rem;border:1px solid #a6b9bd;border-radius:50%;background:var(--swatch)}.drying{grid-column:1/-1}.drying ul{margin:0;padding-left:1.2rem}article details{margin-top:1rem}article details img{display:block;margin:.8rem 0}#all-rolls{display:inline-block;margin-bottom:.5rem}main:has(#overview[hidden]) header{padding:.6rem 0}main:has(#overview[hidden]) header h1{font-size:1.4rem}main:has(#overview[hidden]) header p{display:none}
 </style>
 <main>
 <header><span class="label">Filamentlager</span><h1>Filament-Trockenbox</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
-<label for="search">Rollen suchen</label><input id="search" type="search" placeholder="Material oder Farbe">
+<a id="all-rolls" href="./" hidden>← Alle Rollen</a>
+<div id="overview"><label for="search">Rollen suchen</label><input id="search" type="search" placeholder="Material oder Farbe">
+<div class="fields" style="margin-top:.75rem"><label>Material<select id="material-filter"></select></label><label>Farbe<select id="color-filter"></select></label></div></div>
 <section id="cards" aria-label="Filamentrollen">
 <article id="support-pla-petg-schwarz">
   <span class="label">Rolle 01 · Schwarz</span>
@@ -248,18 +251,128 @@ function element(tag, content) {
   node.textContent = content;
   return node;
 }
+
+const materialFilter = document.querySelector('#material-filter');
+const colorFilter = document.querySelector('#color-filter');
+const overview = document.querySelector('#overview');
+const back = document.querySelector('#all-rolls');
+const qrCodes = {"support-pla-petg-schwarz":"/uaaI/wWnoMQbrZtdLt0mZn126sBAq7BOQXFB/qqqq/gB54pAJ/NEZy5qXUrrqnv9tWqONXxEPg5WrkwtDzQ3GKIXOPr8q2wM2xLenNbOo6QMag2n7REOsqXNJkX720afGySqZhQnk4U5S2utCA+12dZmgRkAZ2nPePAF6codWYNWWJxtf8AcK0UW/rd7yowWzIbE7qIob+d17Bo8W6Oi2MrBKLiLf/p6JjQgA==","petg-matt-gruen-03460604a":"/jdry/wRQqTQbrUvhrt11qWF264J0K7BdJV5B/qqqq/gE1GnAL4gKXPjbFwfCbzXApyOMWFPOhQthg/rlB5+xIBb1zNffzcNsLADGpB7q6LrXUuAs2S9V4tOPXqTstUv7g7eToQhPC6o922RQIfw6skgfrVl/D5JL/QCh49R4UhsuOUkN/4AQ26cY/hPEqrwWR2VG7qSkf+91rncNm68eSoPBB5eOR/vVD5rgA==","sunlu-pla-plus-weiss":"/qGYA/wUwoNQbr5NdLt0tJn126kxQq7BCAfFB/qqqq/gCj5tAJ/VFzy5jdU7zoCO9teLiBHzE/Urmqkw0FDS3GC4JOPz/Cgw92z6ynfSOqHQMYgfyrRGOhsTNJkUu40KfFZ1qZhSLZ4UbSUKNCR+RnNfngSIgZjHMsfAF6cKhWYdWSixtf6AWa8UW/qN5qowUXKbE7rYrR+d1xB58W6LiUMrBIbCIf/uyYiwgA==","sunlu-pla-plus-rot":"/twbA/wVNo9QbrUtVLt0U5v126kJQq7BK8XFB/qqqq/gCX5tAJ+2F7y8CdUnzobqdveLKI3yE/VsGrkwrPHS3GN4POPz4r9w92zC0HdSPEEwMYgVwrRGOotXNpkbsK0afFLkqZhTqlYUbSyb9CR+okFfngep8ZjHNcXAN6dAHWcdSaZRtf+AUK8UW/pl5qowULKbE7qCrR+d1ZB58W6PCUMrBArCIf/siYiwgA==","sunlu-petg-matt-orange":"/l9BQ/wQ7mDQbqjJort1eIWl26o9lK7BYKVZB/qqqq/gEC2nAL4Tg/Pk4JlKSY2VZLyv6KZ/OxawFw/rrGxe5IKLzqrXf5FB9HAiMDp+qS7eCGu41oKfVlL5DnqYvAQ/7kSdboQjH/84f2aSDMfwVvuE87QsiWtJKpLkhe8oCnhsibl1N/+Ac0ycY/kGiqrwUNERG7qcP/+91dwNNm62GyoPBLFMGR/oxC5rgA==","sunlu-petg-matt-blau":"/iZDQ/wSvmDQbrNport1UYWl26wV1K7BQedZB/qqqq/gGl3nAL5dhfPi7klKSYXKZLyv0sJ8OxPg9x/r7LNc5ICsLqrXcjRBNHCWnj7+qMIOCGuEwQK/VrqtD3qQOcQv7koGboQhn9cwf24IzMfw84mE87UHaXtJKM7khe96cnhsmXCVN/+AQUycY/hGiqrwUZERG7rWP/+91UwNNm6tGyoPBHVMGR/tpC5rgA==","sunlu-pla-plus-schwarz":"/mRBa/wQJmDQbqqpxrt1eoWF26490K7BU6ZJB/qqqq/gGG3jAL4Rg3Pk6ZlaCYnXZL6vq7Z9KxagFx/rrGxe5ICLRqLXb5EBsHA+2jr2qgOOGWu4koKdVhHpD3qavQQu7kS/bIQiH+8g/3eaTIfwnruE87WlmWtJItTkhe9LOntsibl1J/+Ac0ycY/kWiyrwUBEVG7qQP1+91RwINm60GwoPBLFMGR/oxD5rgA==","sunlu-pla-plus-klein-blau":"/hxpa/wRQqDQbrVPprt19qeF26oJkK7BRJVJB/qqqq/gH9GjAL5iKfPiZVwKCbjRAp6uUEFMKxY8hg/rlBx85IF7xzrXd7ON8HBLvpL2qIr7SWuEt2S9V8hePHqTo9U+7g7+ToQhPb6g/3QRgIfw+iEi87flPCtJJ/QChe8RwVtsuPUkN/4AYWycY/hfGyrwVR2VG7qQm9+91unINm68ewoPBA5MGR/vVD5rgA==","bambu-lab-pla-matt-grau":"/rayA/wTj4RQbq85XLt0YO6l26V8Zi7BUEcBB/qqqq/gAaVxAKNE8JkqbOU6m8rGtGeiuHMFL4i1y7kwuKvsraTqFE95vhZpInkjEEkbH+5ibPnGmlJkOtEsdUwOqZiZNTKk3M0GuZXdyb6qpFW5o3nxPwGFRR7beaW0XsJg+wBYPL1pkPyAXvz0R/scdyowRzlHErpeTp+N0MBspC6vy9FjBHw1HY/ueIi0gA==","sunlu-abs-hs-schwarz":"/iVDS/wStmTQbrVp5rt1c4WF26hVlK7BYORJB/qqqq/gEt2jAL51hXPj4hlLCYmsZJ6vkPJ9CxPx9w/r7LNcxIGNtqtXajTBNHCaWj7eqGJeCGuAgQKdVtqNDkqQKMQv7g4kbqQhvk8w/2cEjMfwJweEc7UH6XtJKI7kp+97cnlsmWCVN/+AYUycY/lGiyrwWdEVG7raP/+91RwINm6pGwoPBGVPOR/spC5rgA==","bambu-lab-pla-basic-beige":"/hZp6/wRiqDQbrVv5rt19KWF264JkK7BVJdJB/qqqq/gE9HjAL4kK/Pi4QwKCbDVApzOc2FNCxQthh/rlBx+5IF6XyLPZzuNsDCLNJL2qaMrSGuI1WSfV8peP2iTo9Uv7gr+ToQjDLa4f20RQMfwqkMiUrbh/CpJL5ACha9R8Vl8uvQkJv4AQWy8Y/nfEqrwVd3VG7rWk/+912nINm68eyoPBD5/OR/uVC5vgA==","bambu-lab-pla-matt-marineblau":"/sfFG/wQloNQbo3xZLt1SUCV26xoV67BZolxB/qqqq/gHb2SAIvuP4fJxPUth53GuF9B0fibF2Y3lsj3lIHw3GCsTLz3lIaRgfeyr44HbiUjO+WRothc2Iov63ThIEXo8jg3wLzDKi0uR4SVnPY3BuI+I3ZolAnHCYY6ZiBxYJ5gzb5V4fsAeeKEQ/uEnKoQQoGlHLrrj4/90kEruG6LwemBBDe7JW/sBPlzgA=="};
+const colors = {Schwarz:'#131313',Weiß:'#fff',Rot:'#d23936',Grün:'#38a55a',Orange:'#f88733',Blau:'#355fe6','Klein-Blau':'#1729ab',Grau:'#9b9ea0',Beige:'#f7e6de',Marineblau:'#0078bf'};
+const dryingByDevice = {
+  'support-pla-petg-schwarz': ['Umluft-Trockenschrank · 75 °C · 8 Stunden'],
+  'petg-matt-gruen-03460604a': ['SUNLU S4 oder E2 · 65 °C · mindestens 8 Stunden (Vergleichswert, Marke unbestätigt)'],
+  'sunlu-petg-matt-orange': ['SUNLU S4 oder E2 · 65 °C · mindestens 8 Stunden'],
+  'sunlu-petg-matt-blau': ['SUNLU S4 oder E2 · 65 °C · mindestens 8 Stunden'],
+  'bambu-lab-pla-matt-grau': ['Umluft-Trockenschrank · 55 °C · 8 Stunden (EU-Shop)', 'Umluft-Trockenschrank · 50 °C · 8 Stunden (Datenblatt)'],
+  'bambu-lab-pla-matt-marineblau': ['Umluft-Trockenschrank · 55 °C · 8 Stunden (EU-Shop)', 'Umluft-Trockenschrank · 50 °C · 8 Stunden (Datenblatt)'],
+  'bambu-lab-pla-basic-beige': ['Umluft-Trockenschrank · 50 °C · 8 Stunden (Datenblatt und englischer EU-Shop)', 'AMS 2 Pro oder AMS HT · 55 °C · 8 Stunden', 'Umluft-Trockenschrank · 55 °C · 8 Stunden (französischer EU-Shop)'],
+  'sunlu-abs-hs-schwarz': ['50 °C · Gerät und Dauer für ABS HS nicht angegeben']
+};
+function prepareCard(card, color) {
+  const title = card.querySelector('h2').textContent;
+  card.dataset.material = title.match(/Stützmaterial|PLA\+|PETG|ABS|PLA/i)?.[0] ?? title;
+  card.dataset.color = color;
+  const swatch = element('span','');
+  swatch.className = 'swatch';
+  swatch.style.setProperty('--swatch', colors[color] ?? 'transparent');
+  swatch.setAttribute('aria-hidden','true');
+  card.querySelector('.label').prepend(swatch);
+  const profile = element('details','');
+  profile.append(element('summary','Eigene Druckwerte für den X2D'));
+  const editor = element('form','');
+  editor.append(element('p','Diese Werte werden in diesem Browser gespeichert.'));
+  const fields = element('div','');
+  fields.className = 'fields';
+  const profileKey = 'filament-x2d:' + card.id;
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(profileKey)) ?? {}; } catch {}
+  for (const [name,label] of Object.entries({duese:'Düsentemperatur (°C)',platte:'Druckplatte',bett:'Druckbett (°C)',fluss:'Maximaler Volumenstrom (mm³/s)',notiz:'Notizen'})) {
+    const field = element('label',label);
+    const input = element('input','');
+    input.name = name;
+    input.maxLength = 200;
+    input.value = saved[name] ?? '';
+    field.append(input);
+    fields.append(field);
+  }
+  const message = element('p','');
+  message.setAttribute('role','status');
+  editor.append(fields,element('button','Druckwerte speichern'),message);
+  editor.onsubmit = event => {
+    event.preventDefault();
+    try { localStorage.setItem(profileKey,JSON.stringify(Object.fromEntries(new FormData(editor)))); message.textContent = 'Druckwerte gespeichert.'; }
+    catch { message.textContent = 'Speichern in diesem Browser fehlgeschlagen.'; }
+  };
+  profile.append(editor);
+  card.append(profile);
+}
+function addQr(card, packed) {
+  const qr = element('details','');
+  qr.append(element('summary','QR-Code zum Nachdrucken'));
+  const canvas = element('canvas','');
+  canvas.width = canvas.height = 720;
+  const context = canvas.getContext('2d');
+  context.fillStyle = '#fff';
+  context.fillRect(0,0,720,720);
+  context.fillStyle = '#000';
+  const bits = atob(packed);
+  for (let i = 0; i < 37 * 37; i++) {
+    if (bits.charCodeAt(i >> 3) & (128 >> (i % 8))) context.fillRect((i % 37 + 4) * 16,(Math.floor(i / 37) + 4) * 16,16,16);
+  }
+  const image = element('img','');
+  image.alt = 'QR-Code für ' + card.querySelector('h2').textContent + ' · ' + card.dataset.color;
+  image.width = image.height = 176;
+  image.src = canvas.toDataURL();
+  const download = element('a','QR-Code als PNG herunterladen');
+  download.href = image.src;
+  download.download = 'QR-' + card.id + '.png';
+  qr.append(image,download);
+  card.append(qr);
+}
+for (const card of cards.querySelectorAll('article[id]')) {
+  prepareCard(card,card.querySelector('.label').textContent.split(' · ')[1]);
+  const drying = [...card.querySelector('dl').children].filter(field=>field.querySelector('dt').textContent.startsWith('Trocknung'));
+  if (qrCodes[card.id]) addQr(card,qrCodes[card.id]);
+  if (drying.length !== 2) continue;
+  drying[0].querySelector('dt').textContent = 'Trocknung nach Gerät';
+  const existingDrying = drying.map(field => field.querySelector('dd').textContent).join(' · ');
+  const values = dryingByDevice[card.id] ?? [existingDrying + (card.id.startsWith('sunlu-pla-plus-') ? ' · Gerät nicht angegeben' : '')];
+  const list = element('ul','');
+  for (const value of values) list.append(element('li',value));
+  drying[0].querySelector('dd').replaceChildren(list);
+  drying[0].classList.add('drying');
+  drying[1].remove();
+}
+function updateFilterOptions() {
+  for (const [select,key,all] of [[materialFilter,'material','Alle Materialien'],[colorFilter,'color','Alle Farben']]) {
+    const selected = select.value;
+    select.replaceChildren(new Option(all,''));
+    const options = [...new Set([...cards.children].map(card=>card.dataset[key]))].sort((a,b)=>a.localeCompare(b,'de'));
+    for (const value of options) select.add(new Option(value,value));
+    if (options.includes(selected)) select.value = selected;
+  }
+}
 function filter() {
+  const target = document.getElementById(location.hash.slice(1));
+  const single = target?.parentElement === cards && !target.dataset.local;
+  overview.hidden = Boolean(single);
+  back.hidden = !single;
+  form.closest('details').hidden = Boolean(single);
   const query = search.value.trim().toLocaleLowerCase('de');
   for (const card of cards.children) {
-    card.hidden = ![...card.querySelectorAll('h2,.label')].some(node => node.textContent.toLocaleLowerCase('de').includes(query));
+    const matches = [...card.querySelectorAll('h2,.label')].some(node => node.textContent.toLocaleLowerCase('de').includes(query));
+    card.hidden = single ? card !== target : !matches || (materialFilter.value && card.dataset.material !== materialFilter.value) || (colorFilter.value && card.dataset.color !== colorFilter.value);
   }
   document.querySelector('#empty').hidden = [...cards.children].some(card => !card.hidden);
 }
+materialFilter.onchange = colorFilter.onchange = filter;
+window.addEventListener('hashchange', () => { filter(); window.scrollTo(0,0); });
 function render() {
   cards.querySelectorAll('[data-local]').forEach(card => card.remove());
   for (const roll of rolls) {
     const card = element('article','');
     card.dataset.local = '';
+    card.id = 'eigene-rolle-' + roll.id;
     const label = element('span',roll.farbe);
     label.className = 'label';
     const specs = element('dl','');
@@ -278,8 +391,10 @@ function render() {
       form.elements.material.focus();
     };
     card.append(label,element('h2',roll.material),specs,edit);
+    prepareCard(card,roll.farbe);
     cards.append(card);
   }
+  updateFilterOptions();
   filter();
 }
 function clearEditor() {
