@@ -5,7 +5,7 @@
 <title>Filament Bestand</title>
 <style>
 :root{color-scheme:dark;font:16px/1.5 system-ui,sans-serif;background:#10161c;color:#f2f7f6;--mint:#a4f4ce;--muted:#b0c2c7}*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top right,#20443d,transparent 55%);min-height:100vh}main{max-width:54rem;margin:auto;padding:clamp(1rem,5vw,3rem)}header{padding:2rem 0}h1{font-size:clamp(2rem,7vw,4rem);line-height:1.08;margin:.4rem 0}h2{font-size:clamp(1.4rem,5vw,2rem);margin:.25rem 0}.label{font-size:.78rem;text-transform:uppercase;letter-spacing:.15em;color:var(--mint);font-weight:700}p,dt{color:var(--muted)}article,form{background:#18242c;border:1px solid #38514f;border-radius:1.4rem;padding:clamp(1rem,4vw,2rem);margin:1rem 0}article:target{border-color:var(--mint)}dl,.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr));gap:.7rem}dl div{background:#111b21;border-radius:.7rem;padding:.75rem}dt{font-size:.82rem}dd{font-weight:700;margin:.2rem 0 0;overflow-wrap:anywhere}a{color:var(--mint)}input,button{font:inherit;border-radius:.6rem;padding:.65rem .8rem}input{width:100%;background:#111b21;color:inherit;border:1px solid #58716e}button{background:var(--mint);color:#112820;border:0;font-weight:700;cursor:pointer;margin-top:1rem}summary{cursor:pointer;color:var(--mint)}footer{margin:2rem 0;color:var(--muted)}
-[hidden]{display:none!important}select{width:100%;font:inherit;padding:.65rem;border-radius:.6rem;background:#111b21;color:inherit;border:1px solid #58716e}.card-heading{display:flex;align-items:center;gap:1rem}.card-heading-text{min-width:0}.swatch{display:block;flex:none;width:clamp(2.75rem,11vw,3.75rem);aspect-ratio:1;border:2px solid #a6b9bd;border-radius:50%;background:var(--swatch)}.drying{grid-column:1/-1}.drying ul{margin:0;padding-left:1.2rem}article details{margin-top:1rem}article details img{display:block;margin:.8rem 0}#all-rolls{display:inline-block;margin-bottom:.5rem}main:has(#overview[hidden]) header{padding:.6rem 0}main:has(#overview[hidden]) header h1{font-size:1.4rem}main:has(#overview[hidden]) header p{display:none}
+[hidden]{display:none!important}select{width:100%;font:inherit;padding:.65rem;border-radius:.6rem;background:#111b21;color:inherit;border:1px solid #58716e}.card-heading{display:flex;align-items:center;gap:1rem}.card-heading-text{min-width:0}.swatch{display:block;flex:none;width:clamp(2.75rem,11vw,3.75rem);aspect-ratio:1;border:2px solid #a6b9bd;border-radius:50%;background:var(--swatch)}.drying{grid-column:1/-1}.drying ul{margin:0;padding-left:1.2rem}article details{margin-top:1rem}article details img{display:block;margin:.8rem 0}#all-rolls{display:inline-block;margin-bottom:.5rem}main:has(#all-rolls:not([hidden])) header{padding:.6rem 0}main:has(#all-rolls:not([hidden])) header h1{font-size:1.4rem}main:has(#all-rolls:not([hidden])) header p{display:none}
 article:target > .open-roll{display:none}
 .available-filter{display:flex;gap:.6rem;align-items:center;margin-top:.75rem}.available-filter input{width:auto}.stock-undo{margin-top:0}
 .stock-weight-save{grid-column:1/-1;display:flex;gap:.55rem;align-items:flex-end}.stock-weight-save label{flex:1;min-width:0}.stock-weight-save button{flex:0 0 auto;margin:0;border-radius:.35rem;padding:.65rem .75rem;max-width:48%}
@@ -14,10 +14,20 @@ article:target > .open-roll{display:none}
 .location-panel{margin-top:.6rem}.location-layout{display:flex;align-items:flex-start;gap:.6rem;flex-wrap:wrap}.location-layout>div{flex:1 1 13rem;min-width:0}.location-layout>button{margin:0}.location-form{padding:.6rem;margin:0 0 .5rem}.location-manager{margin-top:.75rem}.location-manager h3{margin:0 0 .5rem}
 .location-remove{padding:.65rem;margin-top:.6rem;border:1px solid #58716e;border-radius:.6rem}.location-remove button+button{margin-inline-start:.5rem}.location-manager .stock-weight-save{flex-wrap:wrap}.location-manager .stock-weight-save button{max-width:100%}
 .location-remove-button{display:block;margin-top:.55rem}.location-create-row{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr);align-items:start;gap:.55rem}.location-create-row>button{margin:0;max-width:8.5rem;white-space:normal}.location-create-row>.location-form{min-width:0;padding:0;border:0;background:transparent;margin:0}.location-create-row .stock-weight-save{display:grid;gap:.4rem}.location-create-row .stock-weight-save button{justify-self:start}
+#main-menu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-bottom:1.1rem}#main-menu a{display:block;text-align:center;padding:.65rem .45rem;border:1px solid #58716e;border-radius:.6rem;font-weight:700;text-decoration:none}#main-menu a[aria-current=page]{background:var(--mint);color:#112820}.location-stock-group{background:#18242c;border:1px solid #38514f;border-radius:.8rem;padding:.75rem 1rem;margin:.7rem 0}.location-stock-group h3,.location-stock-group ul,.location-stock-group p{margin:.35rem 0}.location-stock-group li+li{margin-top:.25rem}
 </style>
 <main>
-<header><span class="label">Filamentlager</span><h1>Filament Bestand</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
+<header><h1>Filamentlager</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
 <a id="all-rolls" href="./" hidden>← Alle Rollen</a>
+<nav id="main-menu" aria-label="Hauptmenü">
+  <a id="menu-filaments" href="./" aria-current="page">Filament Bestand</a>
+  <a id="menu-locations" href="#bestand-lagerort">Bestand Lagerort</a>
+</nav>
+<section id="bestand-lagerort" aria-labelledby="location-stock-title" hidden>
+  <h2 id="location-stock-title">Bestand Lagerort</h2>
+  <p>Hier siehst du, welche Rollen an welchem Lagerort liegen.</p>
+  <div id="location-stock-groups"></div>
+</section>
 <div id="overview"><label for="search">Rollen suchen</label><input id="search" type="search" placeholder="Material oder Farbe">
 <div class="fields" style="margin-top:.75rem"><label>Material<select id="material-filter"></select></label><label>Farbe<select id="color-filter"></select></label></div><label class="available-filter"><input id="available-only" type="checkbox"> Nur verfügbare Filamente</label></div>
 <section id="cards" aria-label="Filamentrollen">
@@ -540,14 +550,7 @@ function addStockSection(card, profile) {
   undo.hidden = true;
   let removed;
   const packaging = {unknown:'Unbekannt',sealed:'Originalverpackt',opened:'Angebrochen'};
-  const initial = [{id:'erste-rolle',packaging:'unknown',weight:''}];
-  function readStock() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(storageKey));
-      if (Array.isArray(saved)) return saved;
-    } catch {}
-    return initial;
-  }
+  const readStock = () => stockForCard(card.id);
   function saveStock(next, savedRollId) {
     try { localStorage.setItem(storageKey,JSON.stringify(next)); }
     catch { feedback.textContent = 'Der Bestand konnte in diesem Browser nicht gespeichert werden.'; return; }
@@ -875,19 +878,70 @@ function updateFilterOptions() {
     if (options.includes(selected)) select.value = selected;
   }
 }
+const menu = document.querySelector('#main-menu');
+const filamentMenuLink = document.querySelector('#menu-filaments');
+const locationMenuLink = document.querySelector('#menu-locations');
+const locationOverview = document.querySelector('#bestand-lagerort');
+const locationGroups = document.querySelector('#location-stock-groups');
+function stockForCard(cardId) {
+  try {
+    const saved = JSON.parse(localStorage.getItem('filament-bestand:' + cardId));
+    if (Array.isArray(saved)) return saved;
+  } catch {}
+  return [{id:'erste-rolle',packaging:'unknown',weight:''}];
+}
+function renderLocationOverview() {
+  const places = readLocations();
+  const groups = new Map(places.map(place=>[place.id,{name:place.name,items:[]} ]));
+  const unassigned = {name:'Nicht angegeben',items:[]};
+  for (const card of cards.children) {
+    const title = card.querySelector('h2').textContent+' · '+card.dataset.color;
+    for (const [index,roll] of stockForCard(card.id).entries()) {
+      const group = groups.get(roll.locationId) ?? unassigned;
+      group.items.push({id:card.id,title,index});
+    }
+  }
+  locationGroups.replaceChildren();
+  if (unassigned.items.length) groups.set('',unassigned);
+  for (const {name,items} of groups.values()) {
+    const group = element('section','');
+    group.className = 'location-stock-group';
+    group.append(element('h3',name+' · '+items.length+(items.length===1?' Rolle':' Rollen')));
+    if (items.length) {
+      const list = element('ul','');
+      for (const item of items) {
+        const line = element('li','');
+        const link = element('a',item.title+' · Rolle '+(item.index+1));
+        link.href = '#'+item.id;
+        line.append(link);
+        list.append(line);
+      }
+      group.append(list);
+    } else group.append(element('p','Keine Rollen an diesem Lagerort.'));
+    locationGroups.append(group);
+  }
+  if (!groups.size) locationGroups.append(element('p','Derzeit sind keine Rollen im Bestand.'));
+}
 function filter() {
   const target = document.getElementById(location.hash.slice(1));
-  const single = target?.parentElement === cards && !target.dataset.local;
-  overview.hidden = Boolean(single);
+  const single = target?.parentElement === cards;
+  const locationsView = target === locationOverview;
+  menu.hidden = single;
+  overview.hidden = single || locationsView;
   back.hidden = !single;
-  form.closest('details').hidden = Boolean(single);
-  document.querySelector('#backup').hidden = Boolean(single);
+  cards.hidden = locationsView;
+  locationOverview.hidden = !locationsView;
+  form.closest('details').hidden = single || locationsView;
+  document.querySelector('#backup').hidden = single || locationsView;
+  filamentMenuLink.setAttribute('aria-current',locationsView ? 'false' : 'page');
+  locationMenuLink.setAttribute('aria-current',locationsView ? 'page' : 'false');
+  if (locationsView) renderLocationOverview();
   const query = search.value.trim().toLocaleLowerCase('de');
   for (const card of cards.children) {
     const matches = [...card.querySelectorAll('h2,.label')].some(node => node.textContent.toLocaleLowerCase('de').includes(query));
     card.hidden = single ? card !== target : !matches || (availableOnly.checked && card.dataset.stockCount === '0') || (materialFilter.value && card.dataset.material !== materialFilter.value) || (colorFilter.value && card.dataset.color !== colorFilter.value);
   }
-  document.querySelector('#empty').hidden = [...cards.children].some(card => !card.hidden);
+  document.querySelector('#empty').hidden = locationsView || [...cards.children].some(card => !card.hidden);
 }
 materialFilter.onchange = colorFilter.onchange = availableOnly.onchange = filter;
 window.addEventListener('hashchange', () => { filter(); window.scrollTo(0,0); });
