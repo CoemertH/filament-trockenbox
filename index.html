@@ -10,6 +10,7 @@ article:target > .open-roll{display:none}
 .available-filter{display:flex;gap:.6rem;align-items:center;margin-top:.75rem}.available-filter input{width:auto}.stock-undo{margin-top:0}
 .stock-weight-save{grid-column:1/-1;display:flex;gap:.55rem;align-items:flex-end}.stock-weight-save label{flex:1;min-width:0}.stock-weight-save button{flex:0 0 auto;margin:0;border-radius:.35rem;padding:.65rem .75rem;max-width:48%}
 .stock-weight-save > [role=status]{padding:.65rem .75rem;color:var(--mint);border:1px solid #58716e;border-radius:.35rem}
+.profile-save-row{grid-column:auto;min-width:0;flex-wrap:wrap}.profile-save-row label{flex:1 1 8rem}.profile-save-row button{max-width:100%}.profile-save-row p{margin:0}
 </style>
 <main>
 <header><span class="label">Filamentlager</span><h1>Filament Bestand</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -200,7 +201,7 @@ article:target > .open-roll{display:none}
 </section>
 <p id="empty" hidden>Keine passende Rolle gefunden.</p>
 <details><summary>Neues Filament anlegen oder bearbeiten</summary>
-<form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Material<input name="material" required maxlength="100"></label><label>Farbe<input name="farbe" required maxlength="60"></label><label>Durchmesser<input name="durchmesser" placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" placeholder="500 g"></label><label>Drucktemperatur<input name="druck" placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" placeholder="70 °C · 8 Stunden"></label></div><button>Filamentkarte speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
+<form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Material<input name="material" required maxlength="100"></label><label>Farbe<input name="farbe" required maxlength="60"></label><label>Durchmesser<input name="durchmesser" placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" placeholder="500 g"></label><label>Drucktemperatur<input name="druck" placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" placeholder="70 °C · 8 Stunden"></label></div><button id="card-save">Filamentkarte speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
 <details id="backup"><summary>Datensicherung</summary>
 <p>Sichere eigene Filamentkarten, X2D-Druckwerte, Bestände und Leergewichte. Die Datei kannst du auch in einem anderen Browser importieren.</p>
 <button id="backup-export" type="button">Sicherung exportieren</button>
@@ -500,19 +501,32 @@ function prepareCard(card, color) {
   const message = element('p','');
   message.setAttribute('role','status');
   const save = element('button','Änderung speichern');
-  editor.append(fields,save,message);
+  editor.append(fields);
+  for (const field of [...fields.children]) {
+    const row = element('div','');
+    row.className = 'profile-save-row stock-weight-save';
+    field.before(row);
+    row.append(field);
+  }
+  fields.lastElementChild.append(save,message);
   let baseline = saved;
   const inputs = [...fields.querySelectorAll('input')];
   function updateSaveButton() {
     const changed = inputs.some(input=>input.value!==(baseline[input.name] ?? ''));
     save.hidden = save.disabled = !changed;
   }
-  function onProfileEdit() {
+  function onProfileEdit(event) {
+    const row = event?.target.closest('.profile-save-row');
+    if (row && row !== save.parentElement) row.append(save,message);
     message.textContent = '';
+    message.hidden = true;
     updateSaveButton();
   }
   editor.addEventListener('input',onProfileEdit);
   editor.addEventListener('change',onProfileEdit);
+  editor.addEventListener('keydown',event => {
+    if (event.key==='Enter' && event.target instanceof HTMLInputElement) event.preventDefault();
+  });
   nozzle.onchange = () => {
     drafts[activeNozzle] = Object.fromEntries(new FormData(editor));
     activeNozzle = nozzle.value;
@@ -531,8 +545,9 @@ function prepareCard(card, color) {
       updateSaveButton();
       message.textContent = 'Gespeichert';
     } catch { message.textContent = 'Speichern in diesem Browser fehlgeschlagen.'; }
+    message.hidden = false;
   };
-  updateSaveButton();
+  onProfileEdit();
   profile.append(editor);
   cardHeading.after(profile);
   addStockSection(card,profile);
@@ -671,6 +686,7 @@ function render() {
       form.closest('details').open = true;
       reset.hidden = false;
       status.textContent = '';
+      updateCardSave();
       form.elements.material.focus();
     };
     card.append(label,element('h2',roll.material),specs,edit);
@@ -680,14 +696,25 @@ function render() {
   updateFilterOptions();
   filter();
 }
+const cardSave = document.querySelector('#card-save');
+function updateCardSave() {
+  const savedCard = rolls.find(roll=>roll.id===editing);
+  const changed = !savedCard || [...form.querySelectorAll('input')].some(input=>input.value!==(savedCard[input.name] ?? ''));
+  cardSave.hidden = cardSave.disabled = !changed;
+  cardSave.textContent = savedCard ? 'Änderung speichern' : 'Filamentkarte speichern';
+}
+form.addEventListener('input',updateCardSave);
+form.addEventListener('change',updateCardSave);
 function clearEditor() {
   editing = null;
   form.reset();
   reset.hidden = true;
+  updateCardSave();
 }
 reset.onclick = () => { clearEditor(); status.textContent = ''; };
 form.onsubmit = event => {
   event.preventDefault();
+  if (cardSave.disabled) return;
   const fields = Object.fromEntries([...new FormData(form)].map(([field,value]) => [field,value.trim()]));
   if (!fields.material || !fields.farbe) { status.textContent = 'Bitte Material und Farbe eintragen.'; return; }
   const normalize = value => value.normalize('NFKC').trim().toLocaleLowerCase('de').replace(/\s+/g,' ');
@@ -714,7 +741,7 @@ form.onsubmit = event => {
   clearEditor();
   search.value = '';
   render();
-  status.textContent = 'Rolle gespeichert.';
+  status.textContent = 'Gespeichert';
 };
 
 const backupFile = document.querySelector('#backup-file');
