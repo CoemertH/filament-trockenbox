@@ -1741,6 +1741,10 @@ function render() {
   updateFilterOptions();
   filter();
 }
+const colorDraftKey = 'filament-farbentwurf';
+function readColorDraft() {
+  try { return localStorage.getItem(colorDraftKey) ?? ''; } catch { return ''; }
+}
 const colorInput = form.elements.farbe;
 const colorPicker = form.querySelector('.color-picker');
 const palette = colorPicker.querySelector('.color-palette');
@@ -1767,13 +1771,13 @@ for (const [name,hex] of Object.entries(colors)) {
   circle.setAttribute('aria-hidden','true');
   button.append(circle,name);
   button.onclick = () => {
-    colorInput.value = name;
-    colorInput.dispatchEvent(new Event('input',{bubbles:true}));
+    saveSelectedColor(name);
   };
   palette.append(button);
 }
 colorInput.addEventListener('input',updateColorPalette);
 colorInput.addEventListener('invalid',()=>{ colorPicker.open = true; });
+colorInput.value = readColorDraft();
 updateColorPalette();
 const cardSave = document.querySelector('#card-save');
 const filamentEditor = form.closest('details');
@@ -1787,9 +1791,41 @@ function updateCardSave() {
 }
 form.addEventListener('input',updateCardSave);
 form.addEventListener('change',updateCardSave);
+function findDuplicateCard(material,color) {
+  const normalize = value => value.normalize('NFKC').trim().toLocaleLowerCase('de').replace(/\s+/g,' ');
+  return [...cards.children].find(card => card.id !== 'eigene-rolle-' + editing && normalize(card.querySelector('h2').textContent) === normalize(material) && normalize(card.dataset.color) === normalize(color));
+}
+function saveSelectedColor(name) {
+  const saved = rolls.find(roll=>roll.id===editing);
+  if (editing && !saved) {
+    status.textContent = 'Die Filamentkarte ist nicht mehr vorhanden.';
+    return;
+  }
+  if (saved && findDuplicateCard(saved.material,name)) {
+    status.textContent = 'Für dieses Filament gibt es bereits eine Karte in dieser Farbe.';
+    return;
+  }
+  const next = saved ? rolls.map(roll=>roll.id===saved.id ? {...roll,farbe:name} : roll) : rolls;
+  try {
+    if (!saved) localStorage.setItem(colorDraftKey,name);
+    else if (saved.farbe!==name) localStorage.setItem(key,JSON.stringify(next));
+  } catch {
+    status.textContent = 'Die Farbe konnte in diesem Browser nicht gespeichert werden.';
+    return;
+  }
+  if (saved && saved.farbe!==name) {
+    rolls = next;
+    render();
+  }
+  colorInput.value = name;
+  updateColorPalette();
+  updateCardSave();
+  status.textContent = saved ? 'Farbe gespeichert.' : 'Farbe für die neue Filamentkarte vorgemerkt.';
+}
 function clearEditor() {
   editing = null;
   form.reset();
+  colorInput.value = readColorDraft();
   colorPicker.open = false;
   updateColorPalette();
   reset.hidden = true;
@@ -1802,8 +1838,7 @@ form.onsubmit = event => {
   const fields = Object.fromEntries([...new FormData(form)].map(([field,value]) => [field,value.trim()]));
   if (!fields.material || !fields.farbe) { status.textContent = 'Bitte Material und Farbe eintragen.'; return; }
   if (fields.produktseite && !productPage(fields.produktseite)) { status.textContent = 'Gib eine gültige Produktadresse mit https:// oder http:// ein.'; return; }
-  const normalize = value => value.normalize('NFKC').trim().toLocaleLowerCase('de').replace(/\s+/g,' ');
-  const duplicate = [...cards.children].find(card => card.id !== 'eigene-rolle-' + editing && normalize(card.querySelector('h2').textContent) === normalize(fields.material) && normalize(card.dataset.color) === normalize(fields.farbe));
+  const duplicate = findDuplicateCard(fields.material,fields.farbe);
   if (duplicate) {
     const show = element('button','Rolle zum vorhandenen Bestand hinzufügen');
     show.type = 'button';
@@ -1824,6 +1859,9 @@ form.onsubmit = event => {
   const next = editing ? rolls.map(item => item.id === editing ? roll : item) : [...rolls,roll];
   try { localStorage.setItem(key,JSON.stringify(next)); } catch { status.textContent = 'Speichern in diesem Browser fehlgeschlagen.'; return; }
   rolls = next;
+  if (!editing) {
+    try { localStorage.removeItem(colorDraftKey); } catch {}
+  }
   clearEditor();
   search.value = '';
   render();
