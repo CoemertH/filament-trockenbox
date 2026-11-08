@@ -371,16 +371,16 @@ function addStockSection(card, profile) {
   let removed;
   const packaging = {unknown:'Unbekannt',sealed:'Originalverpackt',opened:'Angebrochen'};
   const readStock = () => stockForCard(card.id);
-  function saveStock(next, savedRollId) {
+  function saveStock(next) {
     try { localStorage.setItem(storageKey,JSON.stringify(next)); }
     catch { feedback.textContent = 'Der Bestand konnte in diesem Browser nicht gespeichert werden.'; return; }
-    renderStock(next,savedRollId);
+    renderStock(next);
     location.refreshAssignments();
     filter();
     feedback.textContent = 'Bestand gespeichert.';
     return true;
   }
-  function stockForm(roll, index, savedRollId, returnRoute = '') {
+  function stockForm(roll, index, returnRoute = '', mode = '') {
     const editor = element('form','');
     if (roll) editor.append(element('strong','Rolle ' + (index + 1)),element('p',weightDescription(roll,nominalWeight(card))));
     const fields = element('div','');
@@ -441,13 +441,17 @@ function addStockSection(card, profile) {
       const row = element('div','');
       row.className = 'stock-weight-save';
       weightLabel.before(row);
-      const saved = element('span','Gespeichert');
-      saved.setAttribute('role','status');
-      row.append(weightLabel,save,saved);
-      const inputs = place ? [condition,gross,empty,weight,place] : [condition,gross,empty,weight];
+      row.append(weightLabel,save);
+      if (mode==='move') {
+        for (const input of [condition,gross,empty,weight]) {
+          input.disabled = true;
+          const label = input.closest('label');
+          if (label) label.hidden = true;
+        }
+      }
+      const inputs = mode==='move' ? [place] : [condition,gross,empty,weight,place];
       const original = inputs.map(input=>input.value);
       const updateSaveButton = () => {
-        saved.hidden = true;
         save.hidden = !inputs.some((input,index)=>input.value!==original[index]);
         save.disabled = save.hidden;
       };
@@ -457,7 +461,7 @@ function addStockSection(card, profile) {
         if (event.key==='Enter' && event.target instanceof HTMLInputElement) event.preventDefault();
       });
       updateSaveButton();
-      saved.hidden = roll.id !== savedRollId;
+
     } else {
       editor.append(save);
     }
@@ -465,30 +469,36 @@ function addStockSection(card, profile) {
       event.preventDefault();
       if (roll && save.hidden) return;
       const stock = readStock();
-      const updated = {...stock.find(item=>item.id===roll?.id),id:roll?.id ?? crypto.randomUUID(),packaging:condition.value,weight:weight.value,gross:gross.value,tare:empty.value};
+      const previous = stock.find(item=>item.id===roll?.id);
+      const updated = mode==='move' ? {...previous,locationId:place.value} :
+        {...previous,id:roll?.id ?? crypto.randomUUID(),packaging:condition.value,weight:weight.value,gross:gross.value,tare:empty.value};
       if (roll && !stock.some(item=>item.id===roll.id)) { error.textContent = 'Diese Rolle ist nicht mehr im Bestand.'; return; }
       if (place) updated.locationId = place.value;
-      const saved = saveStock(roll ? stock.map(item=>item.id===roll.id ? updated : item) : [...stock,updated],roll?.id);
+      const saved = saveStock(roll ? stock.map(item=>item.id===roll.id ? updated : item) : [...stock,updated]);
       if (!saved) error.textContent = 'Die Änderungen konnten nicht gespeichert werden.';
-      else if (returnRoute) window.location.hash = returnRoute;
+      else if (returnRoute) {
+        const label = mode==='move' ? 'Lagerort' : previous.weight!==updated.weight ? 'Restgewicht' : 'Änderung';
+        returnAfterRollSave(returnRoute,label+' für Rolle '+(index+1)+' gespeichert.');
+      }
     };
     editor.append(error);
-    if (roll && !returnRoute) {
-      const remove = element('button','Rolle aufgebraucht');
-      remove.type = 'button';
-      remove.style.marginInlineStart = '.5rem';
-      remove.onclick = () => {
-        const stock = readStock();
-        const current = stock.find(item=>item.id===roll.id);
-        if (!current || !saveStock(stock.filter(item=>item.id!==roll.id))) return;
-        removed = current;
-        undo.hidden = false;
-        if (availableOnly.checked && card.hidden) { availableOnly.checked = false; filter(); }
-        feedback.textContent = 'Rolle als aufgebraucht markiert.';
-      };
-      editor.append(remove);
-    }
     return editor;
+  }
+  function removeRollButton(roll,index) {
+    const remove = element('button','Rolle aufgebraucht');
+    remove.type = 'button';
+    remove.className = 'action-secondary roll-consumed';
+    remove.setAttribute('aria-label','Rolle '+(index+1)+' als aufgebraucht markieren');
+    remove.onclick = () => {
+      const stock = readStock();
+      const current = stock.find(item=>item.id===roll.id);
+      if (!current || !saveStock(stock.filter(item=>item.id!==roll.id))) return;
+      removed = current;
+      undo.hidden = false;
+      if (availableOnly.checked && card.hidden) { availableOnly.checked = false; filter(); }
+      feedback.textContent = 'Rolle als aufgebraucht markiert.';
+    };
+    return remove;
   }
   function saveDrying(rollId, session) {
     const current = readStock();
@@ -500,7 +510,7 @@ function addStockSection(card, profile) {
     }
     return saved;
   }
-  function renderStock(stock, savedRollId) {
+  function renderStock(stock) {
     const parts = ['Bestand: ' + stock.length + (stock.length===1 ? ' Rolle' : ' Rollen')];
     for (const [status,label] of [['sealed','originalverpackt'],['opened','angebrochen']]) {
       const count = stock.filter(item=>item.packaging===status).length;
@@ -538,18 +548,14 @@ function addStockSection(card, profile) {
       const row = element('div','');
       row.className = 'stock-roll-entry';
       const open = rollActionLink(card.id,roll.id,'bestand/'+card.id,'Rolle '+(index+1)+' bearbeiten');
-      const legacy = element('details','');
-      legacy.append(element('summary','Weitere Rollenaktionen'),stockForm(roll,index,savedRollId));
-      row.append(open,element('p',weightDescription(roll,nominalWeight(card))),legacy);
+      row.append(open,element('p',weightDescription(roll,nominalWeight(card))),removeRollButton(roll,index));
       return row;
     });
     entries.replaceChildren(...rows,add,draft);
     dryingEntries.replaceChildren(...stock.map((roll,index)=>{
-      const history = dryingHistory(roll,session=>saveDrying(roll.id,session));
-      const title = history.querySelector('summary');
-      const latest = title.textContent.startsWith('Zuletzt getrocknet') ? ' · '+title.textContent : '';
-      title.textContent = 'Rolle '+(index+1)+' · Trocknung erfassen'+latest;
-      return history;
+      const last = dryingSchedule(roll,null).last;
+      const label = 'Rolle '+(index+1)+' · Trocknung erfassen'+(last?' · zuletzt '+last.split('-').reverse().join('.'):'');
+      return rollActionLink(card.id,roll.id,'bestand/'+card.id,label,'dry');
     }));
     if (!stock.length) dryingEntries.append(element('p','Keine Rollen im Bestand.'));
   }
@@ -561,14 +567,16 @@ function addStockSection(card, profile) {
   };
   section.append(summary,element('p','Der Bestand wird in diesem Browser gespeichert. Gib das Restgewicht direkt ein oder wiege die komplette Rolle und trage das Leergewicht ein.'),tareForm,feedback,undo,entries);
   const location = addLocationSection(card,readStock,saveStock);
-  rollEditors.set(card,(roll,index,returnRoute)=>{
+  rollEditors.set(card,(roll,index,returnRoute,mode)=>{
     const history = dryingHistory(roll,session=>{
       const saved = saveDrying(roll.id,session);
-      if (saved) window.location.hash = returnRoute;
+      if (saved) returnAfterRollSave(returnRoute,'Trocknung für Rolle '+(index+1)+' gespeichert.');
       return saved;
     });
     history.querySelector('summary').textContent = 'Trocknung erfassen';
-    return [stockForm(roll,index,undefined,returnRoute),history];
+    if (mode==='dry') { history.open = true; return [history]; }
+    const form = stockForm(roll,index,returnRoute,mode);
+    return mode==='move' ? [form] : [form,history];
   });
   dryingActions.set(card,{
     saveDrying,
@@ -1150,18 +1158,13 @@ function renderLocationOverview(message = '', managerOpen = false) {
   };
   newName.oninput = refreshSelection;
   let mode = '';
-  function setTransferMode(nextMode, host, item) {
+  function setTransferMode(nextMode) {
     mode = nextMode;
     selected.clear();
     for (const entry of checkboxes) { entry.box.checked = false; entry.box.indeterminate = false; }
     transfer.reset();
     newLabel.hidden = true;
     newName.required = false;
-    if (item) selected.set(JSON.stringify([item.id,item.rollId]),item);
-    for (const option of destination.options) {
-      const source = item?.locationId ? 'id:'+item.locationId : 'unassigned';
-      option.disabled = Boolean(item && option.value===source);
-    }
     transfer.hidden = !mode;
     toggle.textContent = mode==='multiple' ? 'Auswahl beenden' : 'Mehrfachauswahl';
     toggle.setAttribute('aria-expanded',String(mode==='multiple'));
@@ -1171,16 +1174,13 @@ function renderLocationOverview(message = '', managerOpen = false) {
       managerFeedback.textContent = '';
     }
     status.textContent = '';
-    if (host) host.append(transfer,status);
-    else management.after(transfer,status);
+    management.after(transfer,status);
     refreshSelection();
-    if (host) destination.focus();
   }
   toggle.onclick = () => setTransferMode(mode==='multiple' ? '' : 'multiple');
   cancel.onclick = () => {
-    const trigger = mode==='single' ? transfer.parentElement.querySelector('button') : toggle;
     setTransferMode('');
-    trigger?.focus();
+    toggle.focus();
   };
   function checkbox(labelText, items) {
     const label = element('label',labelText);
@@ -1267,6 +1267,8 @@ function renderLocationOverview(message = '', managerOpen = false) {
   toggle.setAttribute('aria-describedby',hint.id);
   choose.append(toggle,hint);
   manage.classList.add('action-secondary');
+  const hasRollen = Boolean(unassigned.items.length || [...groups.values()].some(group=>group.items.length));
+  choose.hidden = !hasRollen;
   toolbar.append(choose,manage);
   const management = element('div','');
   managerFeedback.className = 'location-manager-feedback';
@@ -1331,10 +1333,8 @@ function renderLocationOverview(message = '', managerOpen = false) {
           const rollLabel = 'Rolle '+(roll.index+1)+' · '+weightDescription(roll,item.nominal);
           const row = element('div','');
           row.className = 'location-stock-roll';
-          const move = element('button','Umlagern');
-          move.type = 'button';
+          const move = rollActionLink(roll.id,roll.rollId,'bestand-lagerort','Umlagern','move');
           move.setAttribute('aria-label',item.title+' · '+rollLabel+' umlagern');
-          move.onclick = () => setTransferMode('single',row,roll);
           row.append(rollActionLink(roll.id,roll.rollId,'bestand-lagerort',rollLabel),move,checkbox(item.title+' · '+rollLabel,[roll]));
           line.append(row);
         }
@@ -1343,12 +1343,13 @@ function renderLocationOverview(message = '', managerOpen = false) {
       content.append(list);
     } else content.append(element('p','Keine Rollen an diesem Lagerort.'));
   }
-  if (!groups.size) {
+  if (!hasRollen) {
     const link = element('a','Filament erfassen');
     link.href = '#filament-anlegen';
     const message = element('p','Noch keine Rollen erfasst. ');
+    link.className = 'action-primary role-action-link';
     message.append(link);
-    locationGroups.append(message);
+    locationGroups.prepend(message);
   }
 }
 const sharedPrefix = 'filament/';
@@ -1551,12 +1552,13 @@ function filter() {
     ['lagerbestand/','bestand-lagerort'],
     ['bestand/','filament-bestand'],
     ['trocknung/','trocknung'],
-    ['beispiel/','beispiele']
+    ['beispiel/','beispiele'],
+    ['scan-karte/','scan-ergebnis']
   ];
   const context = contexts.find(([prefix])=>route.startsWith(prefix));
   const resultView = route.startsWith(scanResultPrefix);
   const id = resultView ? route.slice(scanResultPrefix.length) : context ? route.slice(context[0].length) : route;
-  const shared = sharedCardFor(resultView ? id : route);
+  const shared = sharedCardFor(resultView || context?.[1]==='scan-ergebnis' ? id : route);
   const missingLocalCard = /^eigene-rolle-[a-f0-9-]{36}$/i.test(id) && !document.getElementById(id);
   document.querySelector('#missing-local-card').hidden = resultView || !missingLocalCard;
   const target = shared ?? document.getElementById(id);
@@ -1566,7 +1568,7 @@ function filter() {
   const stockDetail = single && context?.[1]==='bestand-lagerort';
   cards.classList.toggle('stock-detail',stockDetail);
   const role = roleView ? resolveRollRoute(route) : null;
-  const returnPage = roleView ? (role?.returnRoute ?? 'filament-bestand') : resultView ? 'filament-scannen' : single ? context?.[1] : null;
+  const returnPage = roleView ? (role?.returnRoute ?? 'filament-bestand') : resultView ? 'filament-scannen' : single ? (context?.[1]==='scan-ergebnis' ? 'scan-ergebnis/'+id : context?.[1]) : null;
   if (returnPage) {
     back.href = '#'+returnPage;
     back.textContent = '← '+(pageTitles[returnPage] ?? (returnPage.startsWith('scan-ergebnis/')?'Scanergebnis':'Filamentkarte'));
@@ -1575,6 +1577,11 @@ function filter() {
     back.textContent = '← Filamentkarte';
   }
   if (stockDetail && route!==previousRoute) target.querySelector('.locations').open = true;
+  if (rollNotice) {
+    rollNotice.hidden = !rollNoticeState || rollNoticeState.route!==route;
+    rollNotice.textContent = rollNotice.hidden ? '' : rollNoticeState.message;
+    if (rollNotice.hidden && previousRoute===rollNoticeState?.route) rollNoticeState = null;
+  }
   previousRoute = route;
   const locationsView = target === locationOverview;
   const inventoryView = route==='filament-bestand';
@@ -1617,7 +1624,7 @@ function filter() {
   }
   const heading = single ? target.querySelector('h2') : null;
   const title = heading ? [heading.textContent,target.dataset.color ?? target.querySelector('.label')?.textContent].filter(Boolean).join(' · ')
-    : roleView ? 'Rolle bearbeiten' : resultView ? 'Filament im Überblick' : missingLocalCard ? 'Filamentkarte' : createView && editing ? 'Filament bearbeiten' : pageTitles[route] ?? 'Hauptmenü';
+    : roleView ? (role?.mode==='move'?'Rolle umlagern':role?.mode==='dry'?'Trocknung erfassen':'Rolle bearbeiten') : resultView ? 'Filament im Überblick' : missingLocalCard ? 'Filamentkarte' : createView && editing ? 'Filament bearbeiten' : pageTitles[route] ?? 'Hauptmenü';
   if (pageNavigation) pageNavigation.hidden = home;
   pageTitle.hidden = Boolean(heading);
   pageTitle.parentElement.hidden = Boolean(heading);
@@ -1806,30 +1813,36 @@ const rolePanel = element('section','');
 rolePanel.className = 'work-panel role-panel';
 rolePanel.hidden = true;
 scanView.after(rolePanel);
-function rollActionLink(cardId,rollId,returnRoute,label) {
+const rollNotice = document.querySelector('#roll-notice');
+let rollNoticeState = null;
+function returnAfterRollSave(route,message) {
+  rollNoticeState = {route,message};
+  window.location.hash = route;
+}
+function rollActionLink(cardId,rollId,returnRoute,label,mode = '') {
   const link = element('a',label);
   link.className = 'role-action-link';
-  link.href = '#rolle/'+[cardId,rollId,returnRoute].map(encodeURIComponent).join('/');
+  link.href = '#rolle/'+[cardId,rollId,returnRoute,mode].map(encodeURIComponent).join('/');
   return link;
 }
 function resolveRollRoute(route) {
   try {
-    const [cardId,rollId,source] = route.slice('rolle/'.length).split('/').map(decodeURIComponent);
+    const [cardId,rollId,source,mode] = route.slice('rolle/'.length).split('/').map(decodeURIComponent);
     const card = document.getElementById(cardId);
     if (!card || card.parentElement!==cards || !rollEditors.has(card)) return null;
     const stock = stockForCard(cardId);
     const index = stock.findIndex(roll=>roll.id===rollId);
     if (index<0) return null;
     const allowed = ['bestand-lagerort','trocknung','bestand/'+cardId,'scan-ergebnis/'+cardId];
-    return {card,roll:stock[index],index,returnRoute:allowed.includes(source)?source:'bestand/'+cardId};
+    return {card,roll:stock[index],index,mode:['move','dry'].includes(mode)?mode:'',returnRoute:allowed.includes(source)?source:'bestand/'+cardId};
   } catch { return null; }
 }
 function renderRolePanel(item) {
   if (!item) { rolePanel.replaceChildren(element('p','Diese Rolle ist nicht mehr im Bestand.')); return; }
-  const {card,roll,index,returnRoute} = item;
+  const {card,roll,index,returnRoute,mode} = item;
   const label = card.querySelector('h2').textContent+' · '+card.dataset.color;
   rolePanel.replaceChildren(element('h2',label),
-    ...rollEditors.get(card)(roll,index,returnRoute));
+    ...rollEditors.get(card)(roll,index,returnRoute,mode));
 }
 const scanResultPrefix = 'scan-ergebnis/';
 const scanResult = element('section','');
@@ -1912,7 +1925,7 @@ function renderScanResult(card,id) {
   const actions = element('div','');
   actions.className = 'scan-result-actions';
   const full = element('a','Vollständige Filamentkarte öffnen');
-  full.href = '#'+id;
+  full.href = '#scan-karte/'+id;
   full.className = 'action-secondary action-link';
   actions.append(again,full);
   scanResult.replaceChildren(heading);
@@ -1943,7 +1956,12 @@ function renderScanResult(card,id) {
       ].join(' · ')),signal);
       if (last) entry.append(element('p','Zuletzt getrocknet: '+last.split('-').reverse().join('.')));
       if (due!==null) entry.append(element('p','Geplant für: '+new Date(due).toISOString().slice(0,10).split('-').reverse().join('.')));
-      entry.append(rollActionLink(card.id,roll.id,'scan-ergebnis/'+id,'Rolle bearbeiten'));
+      const shortcuts = element('div','');
+      shortcuts.className = 'role-shortcuts';
+      shortcuts.append(rollActionLink(card.id,roll.id,'scan-ergebnis/'+id,'Rolle bearbeiten'),
+        rollActionLink(card.id,roll.id,'scan-ergebnis/'+id,'Umlagern','move'),
+        rollActionLink(card.id,roll.id,'scan-ergebnis/'+id,'Trocknung erfassen','dry'));
+      entry.append(shortcuts);
       group.append(entry);
     }
     scanResult.append(group,scanSavedProfiles(card));
@@ -2717,12 +2735,8 @@ function renderDryingDashboard() {
       details.append(element('summary','Trocknungsempfehlungen'),list);
       view.append(details);
     } else view.append(element('p','Keine Trocknungsempfehlung hinterlegt.'));
-    const history = dryingHistory(roll,session=>{
-      const saved = dryingActions.get(card)?.saveDrying(roll.id,session);
-      if (saved) report('Trocknung gespeichert. Die Ampel wurde aktualisiert.');
-      return saved;
-    });
-    history.querySelector('summary').textContent = 'Trocknung erfassen';
+    const history = rollActionLink(card.id,roll.id,'trocknung','Trocknung erfassen','dry');
+    history.classList.add('action-primary');
     const actions = element('div','');
     actions.className = 'drying-actions';
     const mark = element('button',roll.dryingDue ? 'Manuelle Markierung entfernen' : 'Als fällig markieren');
