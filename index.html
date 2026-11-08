@@ -96,6 +96,15 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
 .first-run .action-card{text-decoration:none}
 .first-import{display:inline-flex;align-items:center;min-height:44px}
 .demo-view .inventory-count,.demo-detail>article>:not(.card-heading):not(.demo-manufacturer){display:none!important}
+.inventory-tabs,.first-tools{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+.inventory-tabs strong{margin-right:auto}
+.inventory-tabs a,.role-action-link{display:inline-flex;min-height:44px;align-items:center;padding:.35rem .6rem;border:1px solid var(--work-border);border-radius:.6rem;text-decoration:none}
+.inventory-tabs a[aria-current=page]{background:var(--mint);color:#10261e;border-color:var(--mint);font-weight:700}
+.role-action-link{background:#1e3334;color:#f2faf8}
+.role-panel h2{margin-top:0;overflow-wrap:anywhere}
+.role-panel .drying-history{margin:.75rem 0}
+.first-tools{gap:1rem}
+#backup-stock-conflicts{padding-left:1.2rem}
 </style>
 <main>
 <nav id="page-navigation" aria-label="Seitennavigation" hidden>
@@ -143,9 +152,9 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
     <a id="first-capture" class="action-card action-primary" href="#filament-anlegen" aria-labelledby="first-capture-title" aria-describedby="first-capture-help"><strong id="first-capture-title">Erste Rolle erfassen</strong><small id="first-capture-help">Name, Material, Farbe und Anzahl eingeben</small></a>
     <a class="action-card action-secondary" href="#beispiele" aria-labelledby="first-demo-title" aria-describedby="first-demo-help"><strong id="first-demo-title">Beispiel ansehen</strong><small id="first-demo-help">Filamentkarten kennenlernen</small></a>
   </div>
-  <a class="first-import" href="#datensicherung">Sicherung importieren</a>
+  <div class="first-tools"><a class="first-import" href="#filament-scannen">QR-Code öffnen</a><a class="first-import" href="#datensicherung">Sicherung importieren</a></div>
 </section>
-<p id="demo-notice" class="work-panel" hidden>Das sind Beispielkarten. Sie zählen nicht zu deinem Bestand.</p>
+<p id="demo-notice" class="work-panel" hidden>Das sind Beispielkarten. Sie zählen nicht zu deinem Bestand. <a id="demo-add" class="role-action-link" href="#filament-anlegen" hidden>Eigene Rolle zu diesem Filament hinzufügen</a></p>
 <section id="trocknung" aria-labelledby="page-title" hidden>
   
   <p>Die Ampel zeigt geplante Termine anhand deiner Intervalle und Einträge.</p>
@@ -153,6 +162,9 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
   <p id="drying-dashboard-status" role="status"></p>
   <div id="drying-dashboard-rolls"></div>
 </section>
+<nav id="inventory-tabs" class="work-panel inventory-tabs" aria-label="Bestandsansicht" hidden>
+  <strong>Mein Bestand</strong><a href="#filament-bestand">Nach Filament</a><a href="#bestand-lagerort">Nach Lagerort</a>
+</nav>
 <section id="bestand-lagerort" aria-labelledby="page-title" hidden>
   
   <p>Hier siehst du, welche Rollen an welchem Lagerort liegen.</p>
@@ -372,7 +384,7 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
   <a class="open-roll" href="#bambu-lab-pla-matt-marineblau">Filamentkarte öffnen</a>
 </article>
 </section>
-<p id="empty" hidden>Keine passende Rolle gefunden.</p>
+<div id="empty" class="work-panel" hidden></div>
 <p id="missing-local-card" hidden>Diese Filamentkarte ist in diesem Browser nicht gespeichert. Importiere deine Datensicherung, um das Etikett hier zu öffnen.</p>
 
 <section id="datensicherung" aria-labelledby="page-title" hidden>
@@ -383,6 +395,7 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
 </div>
 <p id="backup-status" role="status"></p>
 <div id="backup-preview" class="work-panel" hidden>
+<ul id="backup-stock-conflicts" hidden aria-label="Rollenlisten, die bei Übernahme ersetzt werden"></ul>
 <label>Bei Konflikten<select id="backup-conflict"><option value="keep">Vorhandene Daten behalten</option><option value="replace">Werte aus der Sicherung übernehmen</option></select></label>
 <button id="backup-import" type="button">Sicherung übernehmen</button>
 </div></section>
@@ -408,5 +421,5 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
     <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
 </template>
 <script src="./filament-stock.js"></script>
-<script src="./filament-app.js?v=11"></script>
+<script src="./filament-app.js?v=12"></script>
 </html>
