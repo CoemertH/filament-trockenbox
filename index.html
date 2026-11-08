@@ -51,7 +51,7 @@ article:target > .open-roll{display:none}
 </section>
 <div id="overview" hidden>
 
-<label for="search">Rollen suchen</label><input id="search" type="search" placeholder="Material oder Farbe">
+<label for="search">Filament suchen</label><input id="search" type="search" placeholder="Name, Material oder Farbe">
 <div class="fields" style="margin-top:.75rem"><label>Material<select id="material-filter"></select></label><label>Farbe<select id="color-filter"></select></label></div><label class="available-filter"><input id="available-only" type="checkbox"> Nur verfügbare Filamente</label></div>
 <section hidden id="cards" aria-label="Filamentrollen">
 <article id="support-pla-petg-schwarz">
@@ -1264,6 +1264,9 @@ function sharedCardFor(route) {
   cards.append(card);
   return card;
 }
+function normalizeSearch(value) {
+  return value.toLocaleLowerCase('de').normalize('NFD').replace(/\p{M}/gu,'').replaceAll('ß','ss').replace(/[^\p{L}\p{N}+]+/gu,' ').trim();
+}
 let previousRoute = null;
 function filter() {
   const route = location.hash.slice(1);
@@ -1292,9 +1295,11 @@ function filter() {
   scanView.hidden = !scanningView;
   document.querySelector('#backup').hidden = !inventoryView;
   if (locationsView) renderLocationOverview();
-  const query = search.value.trim().toLocaleLowerCase('de');
+  const terms = normalizeSearch(search.value).split(' ').filter(Boolean);
   for (const card of cards.children) {
-    const matches = [...card.querySelectorAll('h2,.label')].some(node => node.textContent.toLocaleLowerCase('de').includes(query));
+    const name = card.querySelector('h2')?.textContent ?? '';
+    const searchable = normalizeSearch([name,card.dataset.material,card.dataset.color].join(' '));
+    const matches = terms.every(term=>searchable.includes(term));
     card.hidden = single ? card !== target : !matches || (availableOnly.checked && card.dataset.stockCount === '0') || (materialFilter.value && card.dataset.material !== materialFilter.value) || (colorFilter.value && card.dataset.color !== colorFilter.value);
   }
   document.querySelector('#empty').hidden = !inventoryView || [...cards.children].some(card => !card.hidden);
