@@ -43,7 +43,13 @@ article:target > .open-roll{display:none}
 .location-stock-toolbar button{margin:0;max-width:100%}.location-manager-feedback:empty{display:none}
 @media (max-width:35rem){.location-stock-toolbar{align-items:flex-start;flex-direction:column}}
 .color-picker{grid-column:1/-1;min-width:0;margin:0;padding:.65rem;border:1px solid #38514f;border-radius:.7rem}
-.color-picker legend{padding:0 .3rem;font-weight:700}
+.color-picker summary{display:flex;align-items:center;gap:.45rem;font-weight:700;min-height:2.25rem;list-style:none}
+.color-picker summary::-webkit-details-marker{display:none}
+.color-picker summary::before{content:"▸";flex:none}
+.color-picker[open] summary::before{content:"▾"}
+.color-preview{display:flex;justify-content:flex-end;align-items:center;gap:.4rem;margin-inline-start:auto;min-width:0;text-align:right;font-size:.85rem;color:var(--muted);overflow-wrap:anywhere}
+.color-preview-sample{width:1.45rem;height:.95rem;flex:none;border:1px solid #a6b9bd;border-radius:.2rem;background:var(--preview-color,linear-gradient(to bottom right,#fff 49.5%,#131313 50.5%))}
+.color-picker[open] .color-palette{margin-top:.55rem}
 .color-palette{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,4.35rem),1fr));gap:.35rem;margin-bottom:.65rem}
 .color-palette button{display:grid;justify-items:center;align-content:center;gap:.25rem;min-height:3.5rem;margin:0;padding:.3rem .15rem;border:1px solid transparent;background:#111b21;color:inherit;font-size:.75rem;overflow-wrap:anywhere}
 .color-palette button[aria-pressed=true]{border-color:var(--mint);background:#23383e;color:var(--mint)}
@@ -65,7 +71,7 @@ article:target > .open-roll{display:none}
   <div id="location-stock-groups"></div>
 </section>
 <details id="filament-editor" hidden><summary hidden>Filamentdaten</summary>
-<form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Material<input name="material" required maxlength="100"></label><fieldset class="color-picker"><legend>Farbe</legend><div class="color-palette" aria-label="Gängige Farben"></div><label>Farbname<input name="farbe" required maxlength="60" placeholder="Farbe auswählen oder eigenen Namen eingeben"></label></fieldset><label>Durchmesser<input name="durchmesser" placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" placeholder="500 g"></label><label>Drucktemperatur<input name="druck" placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" placeholder="70 °C · 8 Stunden"></label><label>Produktseite beim Hersteller (optional)<input name="produktseite" type="url" placeholder="https://…"></label></div><button id="card-save">Filamentkarte speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
+<form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Material<input name="material" required maxlength="100"></label><details class="color-picker"><summary>Farbe<span class="color-preview"><span class="color-preview-sample" aria-hidden="true"></span><span class="color-preview-name">Keine Farbe gewählt</span></span></summary><div class="color-palette" aria-label="Gängige Farben"></div><label>Farbname<input name="farbe" required maxlength="60" placeholder="Farbe auswählen oder eigenen Namen eingeben"></label></details><label>Durchmesser<input name="durchmesser" placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" placeholder="500 g"></label><label>Drucktemperatur<input name="druck" placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" placeholder="70 °C · 8 Stunden"></label><label>Produktseite beim Hersteller (optional)<input name="produktseite" type="url" placeholder="https://…"></label></div><button id="card-save">Filamentkarte speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
 <section id="meine-drucker" aria-labelledby="printer-title" hidden>
   <h2 id="printer-title">Meine Drucker</h2>
   <div id="printer-list"></div>
@@ -1718,6 +1724,7 @@ function render() {
     edit.onclick = () => {
       editing = roll.id;
       for (const field of form.querySelectorAll('input')) field.value = roll[field.name] ?? '';
+      colorPicker.open = false;
       updateColorPalette();
       location.hash = 'filament-anlegen';
       filter();
@@ -1735,11 +1742,20 @@ function render() {
   filter();
 }
 const colorInput = form.elements.farbe;
-const palette = form.querySelector('.color-palette');
+const colorPicker = form.querySelector('.color-picker');
+const palette = colorPicker.querySelector('.color-palette');
+const colorSample = colorPicker.querySelector('.color-preview-sample');
+const colorName = colorPicker.querySelector('.color-preview-name');
 function updateColorPalette() {
-  const current = colorInput.value.trim().toLocaleLowerCase('de');
+  const name = colorInput.value.trim();
+  const current = name.toLocaleLowerCase('de');
+  const preset = Object.keys(colors).find(option=>option.toLocaleLowerCase('de')===current);
+  colorName.textContent = name || 'Keine Farbe gewählt';
+  colorSample.hidden = Boolean(name && !preset);
+  if (preset) colorSample.style.setProperty('--preview-color',colors[preset]);
+  else colorSample.style.removeProperty('--preview-color');
   for (const button of palette.children) {
-    button.setAttribute('aria-pressed',String(button.textContent.toLocaleLowerCase('de')===current));
+    button.setAttribute('aria-pressed',String(button.textContent===preset));
   }
 }
 for (const [name,hex] of Object.entries(colors)) {
@@ -1757,6 +1773,7 @@ for (const [name,hex] of Object.entries(colors)) {
   palette.append(button);
 }
 colorInput.addEventListener('input',updateColorPalette);
+colorInput.addEventListener('invalid',()=>{ colorPicker.open = true; });
 updateColorPalette();
 const cardSave = document.querySelector('#card-save');
 const filamentEditor = form.closest('details');
@@ -1773,6 +1790,7 @@ form.addEventListener('change',updateCardSave);
 function clearEditor() {
   editing = null;
   form.reset();
+  colorPicker.open = false;
   updateColorPalette();
   reset.hidden = true;
   updateCardSave();
