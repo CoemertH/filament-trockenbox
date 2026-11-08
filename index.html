@@ -26,6 +26,19 @@ article:target > .open-roll{display:none}
 .profile-fields>.profile-dragging{background:#23383e;border-color:#78b7a0}
 .profile-dragging input{background:#1b2a31;border-color:#698983}
 @media (max-width:40rem){.profile-order-keyboard{display:none}.profile-fields>.profile-save-row{padding:.4rem}.profile-fields>.profile-save-row label{flex-basis:min(8rem,calc(100% - 3.3rem))}}
+.location-stock-sortable{overflow-anchor:none}
+.location-stock-group{position:relative;padding:.65rem .8rem}
+.location-stock-group>details>summary{font-weight:700;overflow-wrap:anywhere;min-height:2.75rem;align-content:center}
+.location-stock-group>.profile-order-handle{position:absolute;top:.65rem;left:.8rem;margin:0;padding:.55rem}
+.location-stock-group>.profile-order-handle+details>summary{padding-inline-start:3.4rem}
+.location-stock-group.profile-dragging{background:#23383e;border-color:#78b7a0}
+.location-stock-group.profile-dragging .location-stock-content{display:none}
+.location-stock-content ul{padding-inline-start:1.15rem}
+.location-stock-content li+li{margin-top:.65rem}
+.location-stock-roll{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;margin-top:.35rem}
+.location-stock-roll button{margin:0;padding:.4rem .6rem}
+.selecting-stock .location-stock-roll button,.selecting-stock .location-stock-roll>span{display:none}
+.stock-transfer[hidden]{display:none}
 </style>
 <main>
 <header><h1>Filamentlager</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -894,84 +907,8 @@ function prepareCard(card, color) {
       orderStatus.textContent = 'Die Reihenfolge konnte nicht gespeichert werden.';
     }
   }
-  let drag;
-  function moveAt(y) {
-    const target = [...fields.children].filter(row=>row!==drag.row).find(row=>{
-      const bounds = row.getBoundingClientRect();
-      return y < (bounds.top+bounds.bottom)/2;
-    });
-    if (target ? drag.row.nextElementSibling!==target : drag.row!==fields.lastElementChild) fields.insertBefore(drag.row,target ?? null);
-  }
-  function startDrag(row,id,y,touch) {
-    const {top,bottom} = row.getBoundingClientRect();
-    drag = {row,id,startY:y,offset:(top+bottom)/2-y,before:fieldOrder(),moved:false,touch};
-    row.classList.add('profile-dragging');
-  }
-  function updateDrag(y) {
-    if (!drag.moved && Math.abs(y-drag.startY)<5) return;
-    drag.moved = true;
-    moveAt(y+drag.offset);
-  }
-  function endDrag(commit) {
-    const {row,before,touch} = drag;
-    drag = null;
-    row.classList.remove('profile-dragging');
-    if (touch) {
-      document.removeEventListener('touchmove',moveTouch,true);
-      document.removeEventListener('touchend',endTouch,true);
-      document.removeEventListener('touchcancel',endTouch,true);
-    }
-    if (commit) saveFieldOrder(before);
-    else applyFieldOrder(before);
-  }
-  function moveTouch(event) {
-    const touch = [...event.touches].find(item=>item.identifier===drag.id);
-    if (!touch) return;
-    if (event.cancelable) event.preventDefault();
-    updateDrag(touch.clientY);
-  }
-  function endTouch(event) {
-    if ([...event.changedTouches].some(item=>item.identifier===drag.id)) endDrag(event.type==='touchend');
-  }
-  function tracksPointer(event) {
-    return drag && !drag.touch && drag.id===event.pointerId;
-  }
-  fields.onpointermove = event => { if (tracksPointer(event)) updateDrag(event.clientY); };
-  fields.onpointerup = event => { if (tracksPointer(event)) endDrag(true); };
-  fields.onpointercancel = fields.onlostpointercapture = event => { if (tracksPointer(event)) endDrag(false); };
-  function addOrderHandle(row) {
-    const handle = element('button','');
-    handle.type = 'button';
-    handle.className = 'profile-order-handle';
-    handle.setAttribute('aria-label',row.querySelector('label').textContent+' verschieben');
-    handle.title = 'Nach oben oder unten verschieben';
-    handle.addEventListener('touchstart',event=>{
-      if (drag || event.touches.length!==1 || !event.cancelable) return;
-      event.preventDefault();
-      const touch = event.changedTouches[0];
-      startDrag(row,touch.identifier,touch.clientY,true);
-      document.addEventListener('touchmove',moveTouch,{capture:true,passive:false});
-      document.addEventListener('touchend',endTouch,true);
-      document.addEventListener('touchcancel',endTouch,true);
-    },{passive:false});
-    handle.onpointerdown = event => {
-      if (event.pointerType==='touch' || event.button!==0 || drag) return;
-      event.preventDefault();
-      fields.setPointerCapture(event.pointerId);
-      startDrag(row,event.pointerId,event.clientY,false);
-    };
-    handle.onkeydown = event => {
-      if (event.key!=='ArrowUp' && event.key!=='ArrowDown') return;
-      event.preventDefault();
-      const adjacent = event.key==='ArrowUp' ? row.previousElementSibling : row.nextElementSibling;
-      if (!adjacent) return;
-      const before = fieldOrder();
-      fields.insertBefore(row,event.key==='ArrowUp' ? adjacent : adjacent.nextElementSibling);
-      saveFieldOrder(before);
-      handle.focus();
-    };
-    row.prepend(handle);
-  }
+  const attachOrderHandle = bindVerticalOrder(fields,fieldOrder,applyFieldOrder,saveFieldOrder);
+  const addOrderHandle = row => attachOrderHandle(row,row.querySelector('label').textContent);
   for (const row of fields.children) addOrderHandle(row);
   const customPrefix = 'eigen:';
   function appendCustomField(name,value) {
@@ -1191,6 +1128,87 @@ function updateFilterOptions() {
 }
 const menu = document.querySelector('#main-menu');
 const locationOverview = document.querySelector('#bestand-lagerort');
+function bindVerticalOrder(fields,fieldOrder,applyFieldOrder,saveFieldOrder,boundsOf = row=>row.getBoundingClientRect()) {
+  let drag;
+  function moveAt(y) {
+    const target = [...fields.children].filter(row=>row!==drag.row).find(row=>{
+      const bounds = boundsOf(row);
+      return y < (bounds.top+bounds.bottom)/2;
+    });
+    if (target ? drag.row.nextElementSibling!==target : drag.row!==fields.lastElementChild) fields.insertBefore(drag.row,target ?? null);
+  }
+  function startDrag(row,id,y,touch) {
+    row.classList.add('profile-dragging');
+    const {top,bottom} = boundsOf(row);
+    drag = {row,id,startY:y,offset:(top+bottom)/2-y,before:fieldOrder(),moved:false,touch};
+  }
+  function updateDrag(y) {
+    if (!drag.moved && Math.abs(y-drag.startY)<5) return;
+    drag.moved = true;
+    moveAt(y+drag.offset);
+  }
+  function endDrag(commit) {
+    const {row,before,touch} = drag;
+    drag = null;
+    row.classList.remove('profile-dragging');
+    if (touch) {
+      document.removeEventListener('touchmove',moveTouch,true);
+      document.removeEventListener('touchend',endTouch,true);
+      document.removeEventListener('touchcancel',endTouch,true);
+    }
+    if (commit) saveFieldOrder(before);
+    else applyFieldOrder(before);
+  }
+  function moveTouch(event) {
+    const touch = [...event.touches].find(item=>item.identifier===drag.id);
+    if (!touch) return;
+    if (event.cancelable) event.preventDefault();
+    updateDrag(touch.clientY);
+  }
+  function endTouch(event) {
+    if ([...event.changedTouches].some(item=>item.identifier===drag.id)) endDrag(event.type==='touchend');
+  }
+  function tracksPointer(event) {
+    return drag && !drag.touch && drag.id===event.pointerId;
+  }
+  fields.onpointermove = event => { if (tracksPointer(event)) updateDrag(event.clientY); };
+  fields.onpointerup = event => { if (tracksPointer(event)) endDrag(true); };
+  fields.onpointercancel = fields.onlostpointercapture = event => { if (tracksPointer(event)) endDrag(false); };
+  function addOrderHandle(row,label) {
+    const handle = element('button','');
+    handle.type = 'button';
+    handle.className = 'profile-order-handle';
+    handle.setAttribute('aria-label',label+' verschieben');
+    handle.title = 'Nach oben oder unten verschieben';
+    handle.addEventListener('touchstart',event=>{
+      if (drag || event.touches.length!==1 || !event.cancelable) return;
+      event.preventDefault();
+      const touch = event.changedTouches[0];
+      startDrag(row,touch.identifier,touch.clientY,true);
+      document.addEventListener('touchmove',moveTouch,{capture:true,passive:false});
+      document.addEventListener('touchend',endTouch,true);
+      document.addEventListener('touchcancel',endTouch,true);
+    },{passive:false});
+    handle.onpointerdown = event => {
+      if (event.pointerType==='touch' || event.button!==0 || drag) return;
+      event.preventDefault();
+      fields.setPointerCapture(event.pointerId);
+      startDrag(row,event.pointerId,event.clientY,false);
+    };
+    handle.onkeydown = event => {
+      if (event.key!=='ArrowUp' && event.key!=='ArrowDown') return;
+      event.preventDefault();
+      const adjacent = event.key==='ArrowUp' ? row.previousElementSibling : row.nextElementSibling;
+      if (!adjacent) return;
+      const before = fieldOrder();
+      fields.insertBefore(row,event.key==='ArrowUp' ? adjacent : adjacent.nextElementSibling);
+      saveFieldOrder(before);
+      handle.focus();
+    };
+    row.prepend(handle);
+  }
+  return addOrderHandle;
+}
 const locationGroups = document.querySelector('#location-stock-groups');
 function stockForCard(cardId) {
   try {
@@ -1199,8 +1217,18 @@ function stockForCard(cardId) {
   } catch {}
   return [{id:'erste-rolle',packaging:'unknown',weight:''}];
 }
+const openLocationGroups = new Set();
+const locationOrderKey = 'filament-lagerorte-reihenfolge';
+function readLocationOrder() {
+  try {
+    const order = JSON.parse(localStorage.getItem(locationOrderKey));
+    if (Array.isArray(order)) return order;
+  } catch {}
+  return [];
+}
 function renderLocationOverview(message = '') {
-  const groups = new Map(readLocations().map(place=>[place.id,{name:place.name,items:[]}]));
+  const places = readLocations();
+  const groups = new Map(places.map(place=>[place.id,{name:place.name,items:[]}]));
   const unassigned = {name:'Nicht angegeben',items:[]};
   for (const card of cards.children) {
     const title = card.querySelector('h2').textContent+' · '+card.dataset.color;
@@ -1216,7 +1244,7 @@ function renderLocationOverview(message = '') {
   const transfer = element('form','');
   transfer.className = 'stock-transfer';
   transfer.hidden = true;
-  const toggle = element('button','Rollen umlagern');
+  const toggle = element('button','Mehrfachauswahl');
   toggle.type = 'button';
   toggle.setAttribute('aria-expanded','false');
   const status = element('p','');
@@ -1234,15 +1262,21 @@ function renderLocationOverview(message = '') {
   newName.maxLength = 60;
   newLabel.hidden = true;
   newLabel.append(newName);
-  const save = element('button','Änderung speichern');
+  const save = element('button','Umlagern');
+  const cancel = element('button','Abbrechen');
+  cancel.type = 'button';
   const selectedCount = element('p','0 Rollen ausgewählt');
   const controls = element('div','');
   controls.className = 'fields';
   controls.append(destinationLabel,newLabel);
-  transfer.append(selectedCount,controls,save);
+  transfer.append(selectedCount,controls,save,cancel);
   function refreshSelection() {
     selectedCount.textContent = selected.size+(selected.size===1?' Rolle ausgewählt':' Rollen ausgewählt');
-    save.disabled = !selected.size || !destination.value || (destination.value==='create'&&!newName.value.trim());
+    const targetName = destination.value==='create' ? newName.value.trim() : destination.selectedOptions[0]?.textContent;
+    const targetId = destination.value.startsWith('id:') ? destination.value.slice(3) : '';
+    const count = [...selected.values()].filter(item=>destination.value==='create' || item.locationId!==targetId).length;
+    save.disabled = !destination.value || !targetName || !count;
+    save.textContent = save.disabled ? 'Umlagern' : (count===1?'1 Rolle':count+' Rollen')+' umlagern – '+targetName;
   }
   destination.onchange = () => {
     newLabel.hidden = destination.value!=='create';
@@ -1250,17 +1284,34 @@ function renderLocationOverview(message = '') {
     refreshSelection();
   };
   newName.oninput = refreshSelection;
-  toggle.onclick = () => {
-    transfer.hidden = !transfer.hidden;
-    toggle.textContent = transfer.hidden ? 'Rollen umlagern' : 'Auswahl beenden';
-    toggle.setAttribute('aria-expanded',String(!transfer.hidden));
-    locationGroups.classList.toggle('selecting-stock',!transfer.hidden);
-    if (transfer.hidden) {
-      selected.clear();
-      for (const item of checkboxes) { item.box.checked = false; item.box.indeterminate = false; }
+  let mode = '';
+  function setTransferMode(nextMode, host, item) {
+    mode = nextMode;
+    selected.clear();
+    for (const entry of checkboxes) { entry.box.checked = false; entry.box.indeterminate = false; }
+    transfer.reset();
+    newLabel.hidden = true;
+    newName.required = false;
+    if (item) selected.set(JSON.stringify([item.id,item.rollId]),item);
+    for (const option of destination.options) {
+      const source = item?.locationId ? 'id:'+item.locationId : 'unassigned';
+      option.disabled = Boolean(item && option.value===source);
     }
+    transfer.hidden = !mode;
+    toggle.textContent = mode==='multiple' ? 'Auswahl beenden' : 'Mehrfachauswahl';
+    toggle.setAttribute('aria-expanded',String(mode==='multiple'));
+    locationGroups.classList.toggle('selecting-stock',mode==='multiple');
     status.textContent = '';
+    if (host) host.append(transfer,status);
+    else toggle.after(transfer,status);
     refreshSelection();
+    if (host) destination.focus();
+  }
+  toggle.onclick = () => setTransferMode(mode==='multiple' ? '' : 'multiple');
+  cancel.onclick = () => {
+    const trigger = mode==='single' ? transfer.parentElement.querySelector('button') : toggle;
+    setTransferMode('');
+    trigger?.focus();
   };
   function checkbox(labelText, items) {
     const label = element('label',labelText);
@@ -1330,19 +1381,54 @@ function renderLocationOverview(message = '') {
       return;
     }
     for (const card of cards.children) card.dispatchEvent(new Event('locations-changed'));
+    openLocationGroups.add(targetId);
     renderLocationOverview(moved===1?'1 Rolle umgelagert.':moved+' Rollen umgelagert.');
   };
   status.textContent = message;
   locationGroups.classList.remove('selecting-stock');
   locationGroups.replaceChildren(toggle,transfer,status);
   refreshSelection();
-  if (unassigned.items.length) groups.set('',unassigned);
-  for (const {name,items} of groups.values()) {
+  const sortable = element('div','');
+  sortable.className = 'location-stock-sortable';
+  locationGroups.append(sortable);
+  const storedOrder = readLocationOrder();
+  const order = [...new Set([...storedOrder,...groups.keys()])].filter(id=>groups.has(id));
+  const groupNodes = new Map();
+  const currentOrder = () => [...sortable.children].map(group=>group.dataset.locationId);
+  const restoreOrder = ids => { for (const id of ids) sortable.append(groupNodes.get(id)); };
+  const addGrip = bindVerticalOrder(sortable,currentOrder,restoreOrder,before=>{
+    const next = currentOrder();
+    if (next.every((id,index)=>id===before[index])) return;
+    try { localStorage.setItem(locationOrderKey,JSON.stringify(next)); }
+    catch {
+      restoreOrder(before);
+      status.textContent = 'Die Reihenfolge konnte nicht gespeichert werden.';
+    }
+  },group=>group.querySelector('summary').getBoundingClientRect());
+  if (unassigned.items.length) { groups.set('',unassigned); order.push(''); }
+  for (const id of order) {
+    const {name,items} = groups.get(id);
     const group = element('section','');
     group.className = 'location-stock-group';
-    group.append(element('h3',name+' · '+items.length+(items.length===1?' Rolle':' Rollen')));
+    group.dataset.locationId = id;
+    const disclosure = element('details','');
+    disclosure.open = openLocationGroups.has(id);
+    disclosure.ontoggle = () => {
+      if (!disclosure.isConnected) return;
+      if (disclosure.open) openLocationGroups.add(id);
+      else openLocationGroups.delete(id);
+    };
+    const content = element('div','');
+    content.className = 'location-stock-content';
+    disclosure.append(element('summary',name+' · '+items.length+(items.length===1?' Rolle':' Rollen')),content);
+    group.append(disclosure);
+    if (id) {
+      groupNodes.set(id,group);
+      addGrip(group,name);
+      sortable.append(group);
+    } else locationGroups.append(group);
     if (items.length) {
-      group.append(checkbox('Alle Rollen an diesem Lagerort auswählen',items));
+      content.append(checkbox('Alle Rollen an diesem Lagerort auswählen',items));
       const byFilament = new Map();
       for (const item of items) {
         if (!byFilament.has(item.id)) byFilament.set(item.id,{...item,count:0,weighed:0,grams:0});
@@ -1368,14 +1454,21 @@ function renderLocationOverview(message = '') {
         line.append(link,' · '+details.join(' · '));
         const rolls = items.filter(roll=>roll.id===item.id);
         for (const roll of rolls) {
-          const weight = roll.weight ? ' · '+roll.weight+' g Rest' : '';
-          line.append(checkbox(item.title+' · Rolle '+(roll.index+1)+weight,[roll]));
+          const weight = roll.weight!=null && String(roll.weight).trim()!=='' ? ' · '+roll.weight+' g Rest' : ' · Restgewicht offen';
+          const rollLabel = 'Rolle '+(roll.index+1)+weight;
+          const row = element('div','');
+          row.className = 'location-stock-roll';
+          const move = element('button','Umlagern');
+          move.type = 'button';
+          move.setAttribute('aria-label',item.title+' · '+rollLabel+' umlagern');
+          move.onclick = () => setTransferMode('single',row,roll);
+          row.append(element('span',rollLabel),move,checkbox(item.title+' · '+rollLabel,[roll]));
+          line.append(row);
         }
         list.append(line);
       }
-      group.append(list);
-    } else group.append(element('p','Keine Rollen an diesem Lagerort.'));
-    locationGroups.append(group);
+      content.append(list);
+    } else content.append(element('p','Keine Rollen an diesem Lagerort.'));
   }
   if (!groups.size) locationGroups.append(element('p','Derzeit sind keine Rollen im Bestand.'));
 }
