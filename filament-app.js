@@ -550,17 +550,14 @@ function addStockSection(card, profile) {
     }
     return saved;
   }
+  const shortcuts = element('div','');
+  shortcuts.className = 'role-shortcuts';
   function renderStock(stock) {
-    const parts = ['Bestand: ' + stock.length + (stock.length===1 ? ' Rolle' : ' Rollen')];
-    for (const [status,label] of [['sealed','originalverpackt'],['opened','angebrochen']]) {
-      const count = stock.filter(item=>item.packaging===status).length;
-      if (count) parts.push(count + ' ' + label);
-    }
-    parts.push(...weightTotals(stock,nominalWeight(card)));
+    const count = stock.length + (stock.length===1 ? ' Rolle' : ' Rollen');
     card.dataset.stockCount = String(stock.length);
     card.querySelector('.inventory-count').textContent = stock.length===1 ? '1 Rolle im Bestand' : stock.length+' Rollen im Bestand';
-    card.querySelector('.detail-stock-summary').textContent = [parts[0].slice('Bestand: '.length),...weightTotals(stock,nominalWeight(card))].join(' · ');
-    summary.textContent = parts.join(' · ');
+    card.querySelector('.detail-stock-summary').textContent = [count,...weightTotals(stock,nominalWeight(card))].join(' · ');
+    summary.textContent = 'Rollen im Bestand';
     const add = element('button','Rolle hinzufügen');
     add.type = 'button';
     add.className = 'stock-add';
@@ -568,7 +565,8 @@ function addStockSection(card, profile) {
     const draft = element('div','');
     draft.hidden = true;
     add.onclick = () => {
-      if (!draft.hidden) return;
+      section.open = true;
+      if (!draft.hidden) { draft.querySelector('select').focus(); return; }
       const editor = stockForm(null);
       const cancel = element('button','Abbrechen');
       cancel.type = 'button';
@@ -589,10 +587,26 @@ function addStockSection(card, profile) {
       const row = element('div','');
       row.className = 'stock-roll-entry';
       const open = rollActionLink(card.id,roll.id,'bestand/'+card.id,'Rolle '+(index+1)+' bearbeiten');
-      row.append(open,element('p',weightDescription(roll,nominalWeight(card))),removeRollButton(roll,index));
+      const place = readLocations().find(item=>item.id===roll.locationId)?.name ?? 'Ohne Lagerort';
+      row.append(open,element('p',place+' · '+weightDescription(roll,nominalWeight(card))),removeRollButton(roll,index));
       return row;
     });
-    entries.replaceChildren(...rows,add,draft);
+    shortcuts.replaceChildren();
+    if (stock.length===1) {
+      shortcuts.append(rollActionLink(card.id,stock[0].id,'bestand/'+card.id,'Rolle bearbeiten'));
+    } else if (stock.length>1) {
+      const edit = element('button','Rolle bearbeiten');
+      edit.type = 'button';
+      edit.className = 'action-secondary';
+      edit.onclick = () => {
+        section.open = true;
+        entries.querySelector('a').focus();
+      };
+      shortcuts.append(edit);
+    }
+    shortcuts.append(add);
+    entries.replaceChildren(draft,...rows);
+    if (!stock.length) entries.append(element('p','Keine Rollen im Bestand.'));
     dryingEntries.replaceChildren(...stock.map((roll,index)=>{
       const last = dryingSchedule(roll,null).last;
       const label = 'Rolle '+(index+1)+' · Trocknung erfassen'+(last?' · zuletzt '+last.split('-').reverse().join('.'):'');
@@ -615,6 +629,17 @@ function addStockSection(card, profile) {
       return saved;
     });
     history.querySelector('summary').textContent = 'Trocknung erfassen';
+    const editor = history.querySelector('form');
+    const recommendations = dryingRecommendations(card);
+    const recommendation = element('div','');
+    recommendation.className = 'work-panel';
+    recommendation.append(element('strong','Empfehlung für dieses Filament'));
+    if (recommendations.length) {
+      const list = element('ul','');
+      for (const value of recommendations) list.append(element('li',value));
+      recommendation.append(list);
+    } else recommendation.append(element('p','Für dieses Filament ist keine Trocknungsempfehlung hinterlegt.'));
+    editor.prepend(recommendation,element('p','Tatsächlich getrocknet mit'));
     if (mode==='dry') { history.open = true; return [history]; }
     const form = stockForm(roll,index,returnRoute,mode);
     return mode==='move' ? [form] : [form,history];
@@ -631,6 +656,7 @@ function addStockSection(card, profile) {
     renderStock(readStock());
     location.refreshAssignments();
   });
+  profile.before(shortcuts);
   profile.after(quickDrying,location.details,section);
   renderStock(readStock());
 }
@@ -1162,7 +1188,7 @@ function readLocationOrder() {
 function renderLocationOverview(message = '', managerOpen = false) {
   const places = readLocations();
   const groups = new Map(places.map(place=>[place.id,{name:place.name,items:[]}]));
-  const unassigned = {name:'Nicht angegeben',items:[]};
+  const unassigned = {name:'Ohne Lagerort',items:[]};
   for (const card of cards.querySelectorAll('article[id]')) {
     const title = card.querySelector('h2').textContent+' · '+card.dataset.color;
     const nominal = nominalWeight(card);
@@ -1396,7 +1422,11 @@ function renderLocationOverview(message = '', managerOpen = false) {
           row.className = 'location-stock-roll';
           const move = rollActionLink(roll.id,roll.rollId,'bestand-lagerort','Umlagern','move');
           move.setAttribute('aria-label',item.title+' · '+rollLabel+' umlagern');
-          row.append(rollActionLink(roll.id,roll.rollId,'bestand-lagerort',rollLabel),move,checkbox(item.title+' · '+rollLabel,[roll]));
+          const description = element('span',rollLabel);
+          description.className = 'roll-description';
+          const edit = rollActionLink(roll.id,roll.rollId,'bestand-lagerort','Bearbeiten');
+          edit.setAttribute('aria-label',item.title+' · '+rollLabel+' bearbeiten');
+          row.append(description,edit,move,checkbox(item.title+' · '+rollLabel,[roll]));
           line.append(row);
         }
         list.append(line);
@@ -2067,7 +2097,7 @@ function renderScanResult(card,id) {
     history.pushState(null,'','#filament-scannen');
     filter();
     window.scrollTo(0,0);
-    scanOpen.click();
+    scanOpen.focus();
   };
   if (!card) {
     scanResult.replaceChildren(element('p','Diese Filamentkarte ist in diesem Browser nicht verfügbar. Falls sie zu deinem eigenen Bestand gehört, kannst du deine Datensicherung importieren.'),again);
@@ -2220,7 +2250,21 @@ const createBatch = createBatchFields();
 const batchSubmit = element('button','Rolle hinzufügen');
 const batchStatus = element('p','');
 batchStatus.setAttribute('role','status');
-batchForm.append(queryLabel,results,existingBatch.fields,batchSubmit,batchStatus);
+const capturePicker = element('div','');
+capturePicker.className = 'capture-picker';
+const templates = element('details','');
+const templateResults = element('div','');
+templateResults.className = 'capture-results';
+templates.append(element('summary','Vorlagen'),templateResults);
+capturePicker.append(queryLabel,element('h2','Meine Filamente'),results,templates);
+const captureSelected = element('div','');
+captureSelected.className = 'work-panel capture-selected';
+const captureSelection = element('strong','');
+const changeSelection = element('button','Ändern');
+changeSelection.type = 'button';
+changeSelection.className = 'action-secondary';
+captureSelected.append(captureSelection,changeSelection);
+batchForm.append(capturePicker,captureSelected,existingBatch.fields,batchSubmit,batchStatus);
 const captureDone = element('section','');
 captureDone.setAttribute('aria-live','polite');
 filamentEditor.insertBefore(captureActions,form);
@@ -2234,7 +2278,10 @@ function batchLabel(count,verb) {
 }
 function updateBatchSubmit() {
   batchSubmit.textContent = batchLabel(existingBatch.quantity.valueAsNumber || 1,'hinzufügen');
-  existingBatch.fields.hidden = existingBatch.fields.disabled = batchSubmit.hidden = !selectedCard;
+  const card = document.getElementById(selectedCard);
+  if (card) captureSelection.textContent = card.querySelector('h2').textContent+' · '+card.dataset.color;
+  capturePicker.hidden = Boolean(selectedCard);
+  captureSelected.hidden = existingBatch.fields.hidden = existingBatch.fields.disabled = batchSubmit.hidden = !selectedCard;
   batchSubmit.disabled = !selectedCard || !existingBatch.quantity.validity.valid;
 }
 function renderCaptureMatches() {
@@ -2244,21 +2291,32 @@ function renderCaptureMatches() {
     return terms.every(term=>text.includes(term));
   });
   if (!matches.some(card=>card.id===selectedCard)) selectedCard = '';
-  results.replaceChildren(...matches.map(card=>{
-    const button = element('button',card.querySelector('h2').textContent+' · '+card.dataset.color);
+  const owned = [];
+  const examples = [];
+  for (const card of matches) {
+    const title = card.querySelector('h2').textContent+' · '+card.dataset.color;
+    const button = element('button',title);
     button.type = 'button';
-    button.setAttribute('aria-pressed',String(card.id===selectedCard));
     button.onclick = () => {
       selectedCard = card.id;
-      for (const option of results.children) option.setAttribute('aria-pressed',String(option===button));
       batchStatus.textContent = '';
       updateBatchSubmit();
+      existingBatch.quantity.focus();
     };
-    return button;
-  }));
-  if (!matches.length) results.append(element('p','Keine passende Filamentkarte gefunden.'));
+    (card.hasAttribute('data-local') || hasRecordedStock(card.id) || stockForCard(card.id).length ? owned : examples).push(button);
+  }
+  results.replaceChildren(...owned);
+  templateResults.replaceChildren(...examples);
+  if (!owned.length) results.append(element('p',terms.length ? 'Keine passenden eigenen Filamente.' : 'Hier erscheinen deine Filamentkarten. Wähle eine Vorlage oder lege ein neues Filament an.'));
+  if (!examples.length) templateResults.append(element('p','Keine passenden Vorlagen.'));
+  templates.hidden = !examples.length && !templates.open;
   updateBatchSubmit();
 }
+changeSelection.onclick = () => {
+  selectedCard = '';
+  renderCaptureMatches();
+  query.focus();
+};
 function showCapture(mode) {
   if (!editing && captureMode==='menu' && mode!=='menu') {
     existingBatch.applyDefaults();
@@ -2287,7 +2345,9 @@ function finishCapture(cardId,count,created = false) {
   const more = element('button','Weitere Rollen erfassen');
   more.type = 'button';
   more.onclick = () => { showCapture('menu'); existingButton.focus(); };
-  const message = element('h2',created ? 'Filament angelegt · '+(count===1?'1 Rolle':count+' Rollen') : batchLabel(count,'hinzugefügt'));
+  const card = document.getElementById(cardId);
+  const title = card.querySelector('h2').textContent+' · '+card.dataset.color;
+  const message = element('h2',created ? 'Filament angelegt · '+batchLabel(count,'').trim() : batchLabel(count,'zu '+title+' hinzugefügt'));
   message.tabIndex = -1;
   const actions = element('div','');
   actions.className = 'role-shortcuts';
@@ -2305,7 +2365,10 @@ function finishCapture(cardId,count,created = false) {
   showCapture('done');
   message.focus();
 }
-existingButton.onclick = () => { showCapture('existing'); query.focus(); };
+existingButton.onclick = () => {
+  showCapture('existing');
+  (selectedCard ? existingBatch.quantity : query).focus();
+};
 createButton.onclick = () => { showCapture('new'); form.elements.material.focus(); };
 query.oninput = renderCaptureMatches;
 existingBatch.quantity.oninput = updateBatchSubmit;
@@ -2463,6 +2526,8 @@ const firstTemplate = document.querySelector('#first-template');
 const firstManual = document.querySelector('#first-manual');
 const firstFilamentFields = document.querySelector('#first-filament-fields');
 const firstTemplateField = document.querySelector('#first-template-field');
+const firstTemplatePreview = document.querySelector('#first-template-preview');
+const firstAdjust = document.querySelector('#first-adjust-template');
 const firstPlaceName = document.querySelector('#first-place-name');
 const firstReview = document.querySelector('#first-review');
 const firstSteps = [...firstForm.querySelectorAll('[data-first-step]')];
@@ -2473,24 +2538,40 @@ for (const card of cards.querySelectorAll('article[id]:not([data-local])')) {
   firstFields.template.add(new Option(card.querySelector('h2').textContent+' · '+card.dataset.color,card.id));
 }
 function chooseFirstEntry(template) {
+  const wasTemplate = firstTemplate.getAttribute('aria-pressed')==='true';
   firstTemplate.setAttribute('aria-pressed',String(template));
   firstManual.setAttribute('aria-pressed',String(!template));
   firstTemplateField.hidden = !template;
-  firstFilamentFields.hidden = template && !firstFields.template.value;
-  firstNext.hidden = firstFilamentFields.hidden;
   firstStatus.textContent = '';
-  if (template) firstFields.template.focus();
-  else firstFields.materialart.focus();
+  if (template) {
+    firstFields.template.onchange();
+    firstFields.template.focus();
+  } else {
+    if (wasTemplate) firstFields.materialart.value = firstFields.farbe.value = firstFields.product.value = '';
+    firstTemplatePreview.hidden = true;
+    firstFilamentFields.hidden = firstNext.hidden = false;
+    firstNext.textContent = 'Weiter';
+    firstFields.materialart.focus();
+  }
 }
 firstTemplate.onclick = () => chooseFirstEntry(true);
 firstManual.onclick = () => chooseFirstEntry(false);
 firstFields.template.onchange = () => {
   const card = document.getElementById(firstFields.template.value);
-  firstFilamentFields.hidden = firstNext.hidden = !card;
+  firstFilamentFields.hidden = true;
+  firstTemplatePreview.hidden = firstNext.hidden = !card;
   firstFields.materialart.value = card?.dataset.material ?? '';
   firstFields.farbe.value = card?.dataset.color ?? '';
-  firstFields.manufacturer.value = '';
   firstFields.product.value = card?.querySelector('h2').textContent ?? '';
+  firstTemplatePreview.querySelector('strong').textContent = card ? firstFields.product.value+' · '+card.dataset.color : '';
+  firstTemplatePreview.querySelector('p').textContent = card ? 'Materialart: '+card.dataset.material : '';
+  firstNext.textContent = 'Vorlage übernehmen';
+};
+firstAdjust.onclick = () => {
+  firstTemplatePreview.hidden = true;
+  firstFilamentFields.hidden = false;
+  firstNext.textContent = 'Weiter';
+  firstFields.product.focus();
 };
 firstFields.place.onchange = () => {
   firstPlaceName.hidden = firstFields.place.value!=='new';
@@ -2503,7 +2584,7 @@ function showFirstStep(step) {
     for (const field of panel.querySelectorAll('input,select')) field.disabled = panel.hidden;
   });
   firstBack.hidden = step===1;
-  firstNext.textContent = step===3 ? 'Filament und Rolle speichern' : 'Weiter';
+  firstNext.textContent = step===3 ? 'Filament und Rolle speichern' : step===1 && !firstTemplatePreview.hidden ? 'Vorlage übernehmen' : 'Weiter';
   firstTitle.textContent = ['Lege dein erstes Filament an','Erste Rolle erfassen','Angaben prüfen'][step-1];
   firstProgress.textContent = 'Schritt '+step+' von 3';
   firstStatus.textContent = '';
@@ -2512,7 +2593,7 @@ function showFirstStep(step) {
 function firstEntry() {
   const materialart = firstFields.materialart.value.trim();
   const farbe = firstFields.farbe.value.trim();
-  const material = [firstFields.manufacturer.value.trim(),firstFields.product.value.trim() || materialart].filter(Boolean).join(' ').slice(0,100);
+  const material = firstFields.product.value.trim() || materialart;
   return {materialart,farbe,material};
 }
 function firstLocation() {
@@ -2522,7 +2603,7 @@ function firstLocation() {
   if (selection==='new') {
     return places.find(place=>place.name.toLocaleLowerCase('de')===name.toLocaleLowerCase('de')) ?? {name};
   }
-  return places.find(place=>place.id===selection) ?? {id:'',name:'Später festlegen'};
+  return places.find(place=>place.id===selection) ?? {id:'',name:'Ohne Lagerort'};
 }
 firstForm.noValidate = true;
 firstBack.onclick = () => showFirstStep(firstStep-1);
@@ -2553,7 +2634,8 @@ firstForm.onsubmit = event => {
     showFirstStep(3);
     return;
   }
-  const existing = findDuplicateCard(entry.material,entry.farbe);
+  const match = findDuplicateCard(entry.material,entry.farbe);
+  const existing = match?.dataset.material.toLocaleLowerCase('de')===entry.materialart.toLocaleLowerCase('de') ? match : null;
   const newCard = existing ? null : {...entry,id:crypto.randomUUID()};
   const cardId = existing?.id ?? 'eigene-rolle-'+newCard.id;
   const locationId = place.id ?? crypto.randomUUID();
@@ -2724,6 +2806,7 @@ document.querySelector('#backup-import').onclick = () => {
 
 const scanOpen = document.querySelector('#scan-open');
 const scanPanel = document.querySelector('#filament-scanner');
+const scanClose = document.querySelector('#scan-close');
 const scanVideo = document.querySelector('#scan-video');
 const scanPhoto = document.querySelector('#scan-photo');
 const scanStatus = document.querySelector('#scan-status');
@@ -2753,6 +2836,7 @@ function closeScanner() {
   scanPhoto.value = '';
   scanStatus.textContent = '';
   scanPanel.hidden = true;
+  scanOpen.hidden = false;
   scanOpen.setAttribute('aria-expanded','false');
 }
 function readQr(image,width,height,limit) {
@@ -2779,13 +2863,16 @@ function openScannedFilament(code) {
 }
 scanOpen.onclick = async () => {
   if (!scanPanel.hidden) { closeScanner(); return; }
-  const session = ++scanSession;
-  scanPanel.hidden = false;
-  scanOpen.setAttribute('aria-expanded','true');
   if (!navigator.mediaDevices?.getUserMedia) {
     scanStatus.textContent = 'Live-Kamera ist hier nicht verfügbar. Wähle ein QR-Foto oder öffne das Filamentlager in Safari oder Chrome.';
     return;
   }
+  const session = ++scanSession;
+  scanPanel.hidden = false;
+  scanOpen.hidden = true;
+  scanOpen.setAttribute('aria-expanded','true');
+  scanClose.textContent = 'Abbrechen';
+  scanClose.focus();
   scanStatus.textContent = 'Warte auf Kamerazugriff …';
   try {
     const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
@@ -2797,6 +2884,7 @@ scanOpen.onclick = async () => {
     scanVideo.hidden = false;
     await scanVideo.play();
     if (session!==scanSession) return;
+    scanClose.textContent = 'Kamera stoppen';
     scanStatus.textContent = 'Halte den QR-Code gut sichtbar vor die Kamera.';
     function scanFrame() {
       if (session!==scanSession) return;
@@ -2810,10 +2898,8 @@ scanOpen.onclick = async () => {
     scanFrame();
   } catch {
     if (session!==scanSession) return;
-    scanStream?.getTracks().forEach(track=>track.stop());
-    scanStream = null;
-    scanVideo.srcObject = null;
-    scanVideo.hidden = true;
+    closeScanner();
+    scanOpen.focus();
     scanStatus.textContent = 'Die Kamera konnte nicht gestartet werden. Prüfe die Kamerafreigabe oder wähle ein QR-Foto.';
   }
 };
@@ -2842,9 +2928,9 @@ document.querySelector('#menu-scan').onclick = event => {
   event.preventDefault();
   history.pushState(null,'','#filament-scannen');
   filter();
-  scanOpen.click();
+  scanOpen.focus();
 };
-document.querySelector('#scan-close').onclick = () => { closeScanner(); scanOpen.focus(); };
+scanClose.onclick = () => { closeScanner(); scanOpen.focus(); };
 window.addEventListener('hashchange',closeScanner);
 window.addEventListener('pagehide',closeScanner);
 

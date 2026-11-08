@@ -32,6 +32,7 @@ scope.localStorage.setItem = (key,value)=>stored.set(key,value);
 new vm.Script(app);
 vm.runInContext(read('filament-stock.js'),scope);
 vm.runInContext(section('const dryingStates','function renderDryingDashboard'),scope);
+vm.runInContext(section('const settingsKey','function initialStockMode'),scope);
 vm.runInContext(section('const backupPrefixes','document.querySelector(\'#backup-export\')'),scope);
 vm.runInContext(section('function saveSelectedColor','function clearEditor'),scope);
 vm.runInContext(section('const materialTypes','function makeSwatch'),scope);

@@ -26,6 +26,11 @@
 #cards .card-page-title{font-size:clamp(1.7rem,5.7vw,2.6rem);line-height:1.15;overflow-wrap:anywhere}
 .capture-actions,.capture-results{display:flex;flex-wrap:wrap;gap:.5rem;margin:.65rem 0}
 .capture-results{max-height:15rem;overflow:auto;padding:.2rem}
+.capture-selected:not([hidden]){display:flex;align-items:center;flex-wrap:wrap;gap:.6rem}
+.capture-selected button{margin:0}
+.capture-picker [hidden],.capture-selected[hidden],#scan-open[hidden]{display:none!important}
+.capture-picker details>summary{padding:.65rem 0}
+.location-stock-roll .roll-description{display:block;margin-top:.45rem}
 .capture-actions button,.capture-results button{margin:0;text-align:left}
 .capture-actions button[aria-pressed=true],.capture-results button[aria-pressed=true]{outline:2px solid var(--mint);outline-offset:2px}
 .capture-batch{min-width:0;margin:.8rem 0;border:1px solid #58716e;border-radius:.65rem;padding:.65rem}
@@ -176,11 +181,15 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
         <button type="button" class="action-card action-secondary" id="first-manual" aria-pressed="false"><strong>Filament selbst eingeben</strong><small>Mit Material und Farbe beginnen</small></button>
       </div>
       <label id="first-template-field" hidden>Vorlage<select name="template"></select></label>
+      <div id="first-template-preview" class="work-panel" hidden>
+        <strong id="first-template-name"></strong>
+        <p id="first-template-material"></p>
+        <button id="first-adjust-template" class="action-secondary" type="button">Vorlage anpassen</button>
+      </div>
       <div class="fields" id="first-filament-fields" hidden>
         <label>Materialart<input name="materialart" list="material-types" maxlength="40" placeholder="z. B. PLA, PETG oder ABS" required></label>
         <label>Farbe<input name="farbe" maxlength="60" placeholder="z. B. Rot" required></label>
-        <label>Hersteller (optional)<input name="manufacturer" maxlength="40"></label>
-        <label>Produktname (optional)<input name="product" maxlength="60"></label>
+        <label>Filamentname (optional)<input name="product" maxlength="100"></label>
       </div>
     </div>
     <div data-first-step="2" hidden>
@@ -272,12 +281,12 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
 <section id="scan-view" aria-labelledby="page-title" hidden>
 
 <div class="action-grid">
-  <button id="scan-open" class="action-card action-primary" type="button" aria-expanded="false" aria-controls="filament-scanner" aria-labelledby="scan-camera-title" aria-describedby="scan-camera-help"><strong id="scan-camera-title">Scanner öffnen</strong><small id="scan-camera-help">QR-Code mit der Kamera lesen</small></button>
+  <button id="scan-open" class="action-card action-primary" type="button" aria-expanded="false" aria-controls="filament-scanner" aria-labelledby="scan-camera-title" aria-describedby="scan-camera-help"><strong id="scan-camera-title">Kamera starten</strong><small id="scan-camera-help">QR-Code mit der Kamera lesen</small></button>
   <label class="action-card action-secondary file-action"><strong id="scan-photo-title">QR-Foto auswählen</strong><small id="scan-photo-help">Gespeichertes Bild verwenden</small><input id="scan-photo" type="file" accept="image/*" aria-labelledby="scan-photo-title" aria-describedby="scan-photo-help"></label>
 </div>
 <section id="filament-scanner" class="work-panel" aria-label="Live-Kamera" hidden>
   <video id="scan-video" autoplay muted playsinline hidden></video>
-  <button id="scan-close" class="action-secondary" type="button">Scanner schließen</button>
+  <button id="scan-close" class="action-secondary" type="button">Abbrechen</button>
 </section>
 <p id="scan-status" role="status"></p>
 </section>
@@ -504,5 +513,5 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
     <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
 </template>
 <script src="./filament-stock.js"></script>
-<script src="./filament-app.js?v=20"></script>
+<script src="./filament-app.js?v=21"></script>
 </html>
