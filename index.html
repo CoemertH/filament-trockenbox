@@ -39,6 +39,9 @@ article:target > .open-roll{display:none}
 .location-stock-roll button{margin:0;padding:.4rem .6rem}
 .selecting-stock .location-stock-roll button,.selecting-stock .location-stock-roll>span{display:none}
 .stock-transfer[hidden]{display:none}
+.location-stock-toolbar{display:flex;flex-wrap:wrap;gap:.6rem;margin:.8rem 0}
+.location-stock-toolbar button{margin:0;max-width:100%}.location-manager-feedback:empty{display:none}
+@media (max-width:35rem){.location-stock-toolbar{align-items:flex-start;flex-direction:column}}
 </style>
 <main>
 <header><h1>Filamentlager</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -342,64 +345,15 @@ function readLocations() {
   } catch {}
   return [];
 }
-function addLocationSection(card, readStock, saveStock) {
-  const details = element('details','');
-  details.className = 'locations';
-  const summary = element('summary','');
-  const panel = element('div','');
-  panel.className = 'location-panel';
-  const layout = element('div','');
-  layout.className = 'location-layout';
-  const assignments = element('div','');
-  const manage = element('button','Lagerorte bearbeiten/hinzufügen');
+function createLocationManager(onChange, feedback, initiallyOpen = false) {
+  const manage = element('button','Lagerorte bearbeiten und hinzufügen');
   manage.type = 'button';
-  manage.setAttribute('aria-expanded','false');
   const manager = element('div','');
   manager.className = 'location-manager';
-  manager.hidden = true;
-  const feedback = element('p','');
-  feedback.setAttribute('role','status');
-  layout.append(assignments,manage);
-  panel.append(layout,manager,feedback);
-  details.append(summary,panel);
-  function refreshAssignments() {
-    const stock = readStock();
-    const locations = readLocations();
-    const names = new Map(locations.map(item=>[item.id,item.name]));
-    const assigned = [...new Set(stock.map(roll=>names.get(roll.locationId) ?? 'Nicht angegeben'))];
-    summary.textContent = 'Lagerort: ' + (assigned.length ? assigned.join(' · ') : 'Keine Rollen im Bestand');
-    assignments.replaceChildren();
-    if (!stock.length) assignments.append(element('p','Sobald eine Rolle im Bestand ist, kannst du ihr einen Lagerort zuweisen.'));
-    stock.forEach((roll,index) => {
-      const editor = element('form','');
-      editor.className = 'location-form';
-      const row = element('div','');
-      row.className = 'stock-weight-save';
-      const label = element('label',stock.length===1 ? 'Lagerort auswählen' : 'Lagerort für Rolle '+(index+1));
-      const select = element('select','');
-      select.add(new Option('Nicht angegeben',''));
-      for (const place of locations) select.add(new Option(place.name,place.id));
-      const previous = names.has(roll.locationId) ? roll.locationId : '';
-      select.value = previous;
-      label.append(select);
-      const save = element('button','Änderung speichern');
-      save.hidden = save.disabled = true;
-      select.onchange = () => {
-        save.hidden = save.disabled = select.value===previous;
-        feedback.textContent = '';
-      };
-      editor.onsubmit = event => {
-        event.preventDefault();
-        if (save.disabled) return;
-        const current = readStock();
-        if (!current.some(item=>item.id===roll.id)) { refreshAssignments(); return; }
-        if (saveStock(current.map(item=>item.id===roll.id ? {...item,locationId:select.value} : item))) feedback.textContent = 'Gespeichert';
-        else feedback.textContent = 'Der Lagerort konnte nicht gespeichert werden.';
-      };
-      row.append(label,save);
-      editor.append(row);
-      assignments.append(editor);
-    });
+  function changed(message) {
+    for (const card of cards.children) card.dispatchEvent(new Event('locations-changed'));
+    if (onChange) onChange(message);
+    else feedback.textContent = message;
   }
   function renderManager() {
     const places = readLocations();
@@ -447,7 +401,9 @@ function addLocationSection(card, readStock, saveStock) {
       replacement.add(new Option('Nicht angegeben',''));
       for (const item of readLocations().filter(item=>item.id!==place.id)) replacement.add(new Option(item.name,item.id));
       if (affected.length) {
-        panel.append(element('p','Betroffene Rollen'));
+        const count = affected.reduce((total,entry)=>total+entry.rows.length,0);
+        panel.append(element('p',count===1 ? 'Eine Rolle ist betroffen.' : count+' Rollen sind betroffen.'));
+        panel.append(element('p','Ohne Ersatzlagerort erscheinen diese Rollen unter „Nicht angegeben“.'));
         const list = element('ul','');
         for (const entry of affected) {
           const item = document.getElementById(entry.key.slice('filament-bestand:'.length));
@@ -488,8 +444,7 @@ function addLocationSection(card, readStock, saveStock) {
           feedback.textContent = 'Der Lagerort konnte nicht entfernt werden.';
           return;
         }
-        for (const currentCard of cards.children) currentCard.dispatchEvent(new Event('locations-changed'));
-        feedback.textContent = 'Lagerort entfernt.';
+        changed('Lagerort entfernt.');
       };
       panel.append(confirm,cancel);
     }
@@ -526,8 +481,7 @@ function addLocationSection(card, readStock, saveStock) {
       const next = place ? places.map(item=>item.id===place.id ? {...item,name} : item) : [...places,{id:crypto.randomUUID(),name}];
       try { localStorage.setItem(locationKey,JSON.stringify(next)); }
       catch { feedback.textContent = 'Der Lagerort konnte nicht gespeichert werden.'; return; }
-      for (const currentCard of cards.children) currentCard.dispatchEvent(new Event('locations-changed'));
-      feedback.textContent = 'Gespeichert';
+      changed(place ? 'Lagerort umbenannt.' : 'Lagerort hinzugefügt.');
     };
     row.append(label,save);
     editor.append(row);
@@ -543,14 +497,75 @@ function addLocationSection(card, readStock, saveStock) {
     }
     return editor;
   }
-  manage.onclick = () => {
-    manager.hidden = !manager.hidden;
-    manage.setAttribute('aria-expanded',String(!manager.hidden));
+  function refresh() {
     if (!manager.hidden) renderManager();
-  };
+  }
+  function setOpen(open) {
+    manager.hidden = !open;
+    manage.setAttribute('aria-expanded',String(open));
+    refresh();
+  }
+  manage.onclick = () => setOpen(manager.hidden);
+  setOpen(initiallyOpen);
+  return {manage,manager,refresh};
+}
+function addLocationSection(card, readStock, saveStock) {
+  const details = element('details','');
+  details.className = 'locations';
+  const summary = element('summary','');
+  const panel = element('div','');
+  panel.className = 'location-panel';
+  const layout = element('div','');
+  layout.className = 'location-layout';
+  const assignments = element('div','');
+  const feedback = element('p','');
+  feedback.setAttribute('role','status');
+  const {manage,manager,refresh} = createLocationManager(null,feedback);
+  layout.append(assignments,manage);
+  panel.append(layout,manager,feedback);
+  details.append(summary,panel);
+  function refreshAssignments() {
+    const stock = readStock();
+    const locations = readLocations();
+    const names = new Map(locations.map(item=>[item.id,item.name]));
+    const assigned = [...new Set(stock.map(roll=>names.get(roll.locationId) ?? 'Nicht angegeben'))];
+    summary.textContent = 'Lagerort: ' + (assigned.length ? assigned.join(' · ') : 'Keine Rollen im Bestand');
+    assignments.replaceChildren();
+    if (!stock.length) assignments.append(element('p','Sobald eine Rolle im Bestand ist, kannst du ihr einen Lagerort zuweisen.'));
+    stock.forEach((roll,index) => {
+      const editor = element('form','');
+      editor.className = 'location-form';
+      const row = element('div','');
+      row.className = 'stock-weight-save';
+      const label = element('label',stock.length===1 ? 'Lagerort auswählen' : 'Lagerort für Rolle '+(index+1));
+      const select = element('select','');
+      select.add(new Option('Nicht angegeben',''));
+      for (const place of locations) select.add(new Option(place.name,place.id));
+      const previous = names.has(roll.locationId) ? roll.locationId : '';
+      select.value = previous;
+      label.append(select);
+      const save = element('button','Änderung speichern');
+      save.hidden = save.disabled = true;
+      select.onchange = () => {
+        save.hidden = save.disabled = select.value===previous;
+        feedback.textContent = '';
+      };
+      editor.onsubmit = event => {
+        event.preventDefault();
+        if (save.disabled) return;
+        const current = readStock();
+        if (!current.some(item=>item.id===roll.id)) { refreshAssignments(); return; }
+        if (saveStock(current.map(item=>item.id===roll.id ? {...item,locationId:select.value} : item))) feedback.textContent = 'Gespeichert';
+        else feedback.textContent = 'Der Lagerort konnte nicht gespeichert werden.';
+      };
+      row.append(label,save);
+      editor.append(row);
+      assignments.append(editor);
+    });
+  }
   card.addEventListener('locations-changed',() => {
     refreshAssignments();
-    if (!manager.hidden) renderManager();
+    refresh();
   });
   refreshAssignments();
   return {details,refreshAssignments};
@@ -1225,7 +1240,7 @@ function readLocationOrder() {
   } catch {}
   return [];
 }
-function renderLocationOverview(message = '') {
+function renderLocationOverview(message = '', managerOpen = false) {
   const places = readLocations();
   const groups = new Map(places.map(place=>[place.id,{name:place.name,items:[]}]));
   const unassigned = {name:'Nicht angegeben',items:[]};
@@ -1302,7 +1317,7 @@ function renderLocationOverview(message = '') {
     locationGroups.classList.toggle('selecting-stock',mode==='multiple');
     status.textContent = '';
     if (host) host.append(transfer,status);
-    else toggle.after(transfer,status);
+    else management.after(transfer,status);
     refreshSelection();
     if (host) destination.focus();
   }
@@ -1385,7 +1400,16 @@ function renderLocationOverview(message = '') {
   };
   status.textContent = message;
   locationGroups.classList.remove('selecting-stock');
-  locationGroups.replaceChildren(toggle,transfer,status);
+  const managerFeedback = element('p','');
+  managerFeedback.setAttribute('role','status');
+  const {manage,manager} = createLocationManager(message=>renderLocationOverview(message,true),managerFeedback,managerOpen);
+  const toolbar = element('div','');
+  toolbar.className = 'location-stock-toolbar';
+  toolbar.append(toggle,manage);
+  const management = element('div','');
+  managerFeedback.className = 'location-manager-feedback';
+  management.append(manager,managerFeedback);
+  locationGroups.replaceChildren(toolbar,management,transfer,status);
   refreshSelection();
   const sortable = element('div','');
   sortable.className = 'location-stock-sortable';
