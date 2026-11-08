@@ -22,7 +22,10 @@ article:target > .open-roll{display:none}
 #filament-scanner{padding:.85rem;margin-bottom:1rem;border:1px solid #58716e;border-radius:.7rem}#scan-video{display:block;width:100%;max-height:18rem;object-fit:contain;background:#10161c;margin-bottom:.6rem}
 #main-menu a{background:#18242c}#main-menu a:hover,#main-menu a:focus-visible{background:#24443d}#scan-view>button{margin-bottom:.7rem}
 .custom-profile-editor{margin-top:.65rem}.custom-profile-row label{overflow-wrap:anywhere}
-.profile-fields{grid-template-columns:1fr;overflow-anchor:none}.profile-order-handle{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab;min-width:2.75rem;min-height:2.75rem}.profile-order-handle::before{content:"";display:block;margin:auto;width:1rem;height:2px;background:currentColor;box-shadow:0 -5px currentColor,0 5px currentColor}.profile-dragging .profile-order-handle{cursor:grabbing}.profile-dragging{outline:1px dashed var(--mint);outline-offset:3px}
+.profile-fields{grid-template-columns:1fr;overflow-anchor:none}.profile-order-handle{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab;min-width:2.75rem;min-height:2.75rem}.profile-order-handle::before{content:"";display:block;margin:auto;width:1rem;height:2px;background:currentColor;box-shadow:0 -5px currentColor,0 5px currentColor}.profile-dragging .profile-order-handle{cursor:grabbing}.profile-fields>.profile-save-row{border:1px solid #405956;border-radius:.5rem;padding:.5rem}
+.profile-fields>.profile-dragging{background:#23383e;border-color:#78b7a0}
+.profile-dragging input{background:#1b2a31;border-color:#698983}
+@media (max-width:40rem){.profile-order-keyboard{display:none}.profile-fields>.profile-save-row{padding:.4rem}.profile-fields>.profile-save-row label{flex-basis:min(8rem,calc(100% - 3.3rem))}}
 </style>
 <main>
 <header><h1>Filamentlager</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -856,7 +859,10 @@ function prepareCard(card, color) {
   const orderKey = '__reihenfolge';
   const orderStatus = element('p','');
   orderStatus.setAttribute('role','status');
-  const orderHelp = element('p','Ziehe am Griff, um ein Feld zu verschieben. Mit der Tastatur kannst du am Griff die Pfeiltasten verwenden.');
+  const orderHelp = element('p','Am Griff halten und nach oben oder unten ziehen.');
+  const keyboardHelp = element('span',' Mit der Tastatur kannst du am Griff die Pfeiltasten verwenden.');
+  keyboardHelp.className = 'profile-order-keyboard';
+  orderHelp.append(keyboardHelp);
   editor.insertBefore(orderHelp,fields);
   editor.append(orderStatus);
   const rowName = row => row.querySelector('input').name;
