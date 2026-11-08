@@ -126,6 +126,8 @@ function createLocationManager(onChange, feedback, initiallyOpen = false) {
       const confirm = element('button','Lagerort endgültig entfernen');
       const cancel = element('button','Abbrechen');
       confirm.type = cancel.type = 'button';
+      confirm.className = 'action-danger';
+      cancel.className = 'action-secondary';
       cancel.onclick = () => { panel.remove(); trigger.hidden = false; trigger.focus(); };
       confirm.onclick = () => {
         const written = [];
@@ -218,7 +220,7 @@ function createLocationManager(onChange, feedback, initiallyOpen = false) {
 }
 function addLocationSection(card, readStock, saveStock) {
   const details = element('details','');
-  details.className = 'locations';
+  details.className = 'locations filament-section';
   const summary = element('summary','');
   const panel = element('div','');
   panel.className = 'location-panel';
@@ -281,7 +283,7 @@ function dryingRecommendations(card) {
 }
 function createDryingSection(card) {
   const section = element('details','');
-  section.className = 'drying-quick';
+  section.className = 'drying-quick filament-section';
   const recommendations = dryingRecommendations(card);
   const value = recommendations[0] ?? '';
   const temperature = value.match(/\d+(?:[,.]\d+)?(?:\s*[–-]\s*\d+(?:[,.]\d+)?)?\s*°C/i)?.[0];
@@ -298,7 +300,7 @@ function createDryingSection(card) {
 }
 function addStockSection(card, profile) {
   const section = element('details','');
-  section.className = 'stock';
+  section.className = 'stock filament-section';
   const summary = element('summary','');
   const entries = element('div','');
   const feedback = element('p','');
@@ -469,6 +471,7 @@ function addStockSection(card, profile) {
     }
     parts.push(...weightTotals(stock,nominalWeight(card)));
     card.dataset.stockCount = String(stock.length);
+    card.querySelector('.inventory-count').textContent = stock.length===1 ? '1 Rolle im Bestand' : stock.length+' Rollen im Bestand';
     summary.textContent = parts.join(' · ');
     const add = element('button','Rolle hinzufügen');
     add.type = 'button';
@@ -615,10 +618,13 @@ function prepareCard(card, color, metadata = {}) {
   const text = element('div','');
   text.className = 'card-heading-text';
   label.before(cardHeading);
-  text.append(label,heading);
+  const inventoryCount = element('p','');
+  inventoryCount.className = 'inventory-count';
+  text.append(label,heading,inventoryCount);
   if (shade) cardHeading.append(swatch);
   cardHeading.append(text);
   const profile = element('details','');
+  profile.className = 'filament-section';
   profile.append(element('summary','Eigene Druckwerte'));
   const editor = element('form','');
   editor.append(element('p','Diese Werte werden in diesem Browser gespeichert.'));
@@ -1072,6 +1078,7 @@ function renderLocationOverview(message = '', managerOpen = false) {
   const save = element('button','Umlagern');
   const cancel = element('button','Abbrechen');
   cancel.type = 'button';
+  cancel.className = 'action-secondary';
   const selectedCount = element('p','0 Rollen ausgewählt');
   const controls = element('div','');
   controls.className = 'fields';
@@ -1202,7 +1209,14 @@ function renderLocationOverview(message = '', managerOpen = false) {
   const {manage,manager,setOpen: setManagerOpen} = createLocationManager(message=>renderLocationOverview(message,true),managerFeedback,managerOpen);
   const toolbar = element('div','');
   toolbar.className = 'location-stock-toolbar';
-  toolbar.append(toggle,manage);
+  const choose = element('div','');
+  const hint = element('small','Mehrere Rollen gemeinsam umlagern');
+  hint.id = 'stock-selection-help';
+  hint.className = 'action-note';
+  toggle.setAttribute('aria-describedby',hint.id);
+  choose.append(toggle,hint);
+  manage.classList.add('action-secondary');
+  toolbar.append(choose,manage);
   const management = element('div','');
   managerFeedback.className = 'location-manager-feedback';
   management.append(manager,managerFeedback);
@@ -1522,6 +1536,7 @@ function filter() {
     back.hidden = false;
   }
   cards.hidden = !single && !inventoryView;
+  cards.classList.toggle('inventory-view',inventoryView);
   locationOverview.hidden = !locationsView;
   filamentEditor.hidden = !createView;
   filamentEditor.open = createView;
@@ -1688,6 +1703,7 @@ function scanSpecs(card, tests) {
 }
 function scanSavedProfiles(card) {
   const section = element('section','');
+  section.className = 'work-panel scan-profile';
   const printer = element('select','');
   const nozzle = element('select','');
   const printers = readPrinters();
@@ -1752,8 +1768,9 @@ function renderScanResult(card,id) {
   actions.className = 'scan-result-actions';
   const full = element('a','Vollständige Filamentkarte öffnen');
   full.href = '#'+id;
+  full.className = 'action-secondary action-link';
   actions.append(again,full);
-  scanResult.replaceChildren(heading,actions);
+  scanResult.replaceChildren(heading);
   const shared = card.hasAttribute('data-shared-filament');
   if (shared) {
     scanResult.append(element('p','Geteilte Momentaufnahme. Persönlicher Bestand und eigene Druckwerte sind hier nicht enthalten.'));
@@ -1786,7 +1803,13 @@ function renderScanResult(card,id) {
     scanResult.append(group,scanSavedProfiles(card));
   }
   const specs = scanSpecs(card,[/Durchmesser/i,/Düsentemperatur|Drucktemperatur/i,/Druckbett/i,/^Trocknung/i]);
-  if (specs.children.length) scanResult.append(element('h2','Herstellerangaben'),specs);
+  scanResult.append(actions);
+  if (specs.children.length) {
+    const manufacturer = element('details','');
+    manufacturer.className = 'filament-section';
+    manufacturer.append(element('summary','Herstellerangaben'),specs);
+    scanResult.append(manufacturer);
+  }
 }
 
 document.querySelector('#new-filament').onclick = () => { clearEditor(); showCapture('menu'); status.textContent = ''; };
@@ -1839,8 +1862,20 @@ function makeBatch(batch) {
 }
 const captureActions = element('div','');
 captureActions.className = 'capture-actions';
-const existingButton = element('button','Rollen zu vorhandenem Filament hinzufügen');
-const createButton = element('button','Neues Filament anlegen');
+function captureChoice(title,description,id) {
+  const button = element('button','');
+  button.className = 'action-card action-secondary';
+  const label = element('strong',title);
+  const help = element('small',description);
+  label.id = id+'-title';
+  help.id = id+'-help';
+  button.setAttribute('aria-labelledby',label.id);
+  button.setAttribute('aria-describedby',help.id);
+  button.append(label,help);
+  return button;
+}
+const existingButton = captureChoice('Vorhandenes Filament','Rollen zu einer bestehenden Karte hinzufügen','capture-existing');
+const createButton = captureChoice('Neues Filament','Karte und erste Rollen anlegen','capture-new');
 existingButton.type = createButton.type = 'button';
 captureActions.append(existingButton,createButton);
 const batchForm = element('form','');
@@ -2207,6 +2242,7 @@ function closeScanner() {
   scanVideo.srcObject = null;
   scanVideo.hidden = true;
   scanPhoto.value = '';
+  scanStatus.textContent = '';
   scanPanel.hidden = true;
   scanOpen.setAttribute('aria-expanded','false');
 }
@@ -2317,6 +2353,7 @@ function renderPrinters() {
     const entry = element('article','');
     entry.append(element('h3',printer.name));
     const list = element('ul','');
+    list.className = 'printer-nozzles-summary';
     for (const item of printerNozzles(printer)) list.append(element('li',nozzleName(printer,item.position)+(item.diameter?' · '+item.diameter+' mm':'')));
     entry.append(list);
     const edit = element('details','');
@@ -2516,6 +2553,7 @@ function renderDryingDashboard() {
     actions.className = 'drying-actions';
     const mark = element('button',roll.dryingDue ? 'Manuelle Markierung entfernen' : 'Als fällig markieren');
     mark.type = 'button';
+    mark.className = 'action-secondary';
     mark.onclick = () => {
       const saved = dryingActions.get(card)?.markDue(roll.id,!roll.dryingDue);
       report(saved ? (roll.dryingDue ? 'Manuelle Markierung entfernt.' : 'Rolle als fällig markiert.') : 'Die Markierung konnte nicht gespeichert werden.');
