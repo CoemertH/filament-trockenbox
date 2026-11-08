@@ -22,7 +22,7 @@ article:target > .open-roll{display:none}
 #filament-scanner{padding:.85rem;margin-bottom:1rem;border:1px solid #58716e;border-radius:.7rem}#scan-video{display:block;width:100%;max-height:18rem;object-fit:contain;background:#10161c;margin-bottom:.6rem}
 #main-menu a{background:#18242c}#main-menu a:hover,#main-menu a:focus-visible{background:#24443d}#scan-view>button{margin-bottom:.7rem}
 .custom-profile-editor{margin-top:.65rem}.custom-profile-row label{overflow-wrap:anywhere}
-.profile-fields{grid-template-columns:1fr}.profile-order-handle{touch-action:none;cursor:grab;min-width:2.75rem;font-size:1.15rem}.profile-dragging .profile-order-handle{cursor:grabbing}.profile-dragging{outline:1px dashed var(--mint);outline-offset:3px}
+.profile-fields{grid-template-columns:1fr;overflow-anchor:none}.profile-order-handle{touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab;min-width:2.75rem;min-height:2.75rem}.profile-order-handle::before{content:"";display:block;margin:auto;width:1rem;height:2px;background:currentColor;box-shadow:0 -5px currentColor,0 5px currentColor}.profile-dragging .profile-order-handle{cursor:grabbing}.profile-dragging{outline:1px dashed var(--mint);outline-offset:3px}
 </style>
 <main>
 <header><h1>Filamentlager</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -896,44 +896,63 @@ function prepareCard(card, color) {
     });
     if (target ? drag.row.nextElementSibling!==target : drag.row!==fields.lastElementChild) fields.insertBefore(drag.row,target ?? null);
   }
-  function scrollWhileDragging() {
-    if (!drag) return;
-    const edge = 85;
-    const distance = drag.y < edge ? -12 : drag.y > window.innerHeight-edge ? 12 : 0;
-    if (distance) { window.scrollBy(0,distance); moveAt(drag.y); }
-    drag.frame = requestAnimationFrame(scrollWhileDragging);
+  function startDrag(row,id,y,touch) {
+    const {top,bottom} = row.getBoundingClientRect();
+    drag = {row,id,startY:y,offset:(top+bottom)/2-y,before:fieldOrder(),moved:false,touch};
+    row.classList.add('profile-dragging');
   }
-  function endDrag(event,commit) {
-    if (!drag || drag.pointer!==event.pointerId) return;
-    const {row,before,frame} = drag;
+  function updateDrag(y) {
+    if (!drag.moved && Math.abs(y-drag.startY)<5) return;
+    drag.moved = true;
+    moveAt(y+drag.offset);
+  }
+  function endDrag(commit) {
+    const {row,before,touch} = drag;
     drag = null;
-    cancelAnimationFrame(frame);
     row.classList.remove('profile-dragging');
+    if (touch) {
+      document.removeEventListener('touchmove',moveTouch,true);
+      document.removeEventListener('touchend',endTouch,true);
+      document.removeEventListener('touchcancel',endTouch,true);
+    }
     if (commit) saveFieldOrder(before);
     else applyFieldOrder(before);
   }
-  fields.onpointermove = event => {
-    if (!drag || event.pointerId!==drag.pointer) return;
-    if (!drag.moved && Math.abs(event.clientY-drag.y)<5) return;
-    drag.moved = true;
-    drag.y = event.clientY;
-    moveAt(drag.y);
-  };
-  fields.onpointerup = event => endDrag(event,true);
-  fields.onpointercancel = fields.onlostpointercapture = event => endDrag(event,false);
+  function moveTouch(event) {
+    const touch = [...event.touches].find(item=>item.identifier===drag.id);
+    if (!touch) return;
+    if (event.cancelable) event.preventDefault();
+    updateDrag(touch.clientY);
+  }
+  function endTouch(event) {
+    if ([...event.changedTouches].some(item=>item.identifier===drag.id)) endDrag(event.type==='touchend');
+  }
+  function tracksPointer(event) {
+    return drag && !drag.touch && drag.id===event.pointerId;
+  }
+  fields.onpointermove = event => { if (tracksPointer(event)) updateDrag(event.clientY); };
+  fields.onpointerup = event => { if (tracksPointer(event)) endDrag(true); };
+  fields.onpointercancel = fields.onlostpointercapture = event => { if (tracksPointer(event)) endDrag(false); };
   function addOrderHandle(row) {
-    const handle = element('button','↕');
+    const handle = element('button','');
     handle.type = 'button';
     handle.className = 'profile-order-handle';
     handle.setAttribute('aria-label',row.querySelector('label').textContent+' verschieben');
     handle.title = 'Nach oben oder unten verschieben';
+    handle.addEventListener('touchstart',event=>{
+      if (drag || event.touches.length!==1 || !event.cancelable) return;
+      event.preventDefault();
+      const touch = event.changedTouches[0];
+      startDrag(row,touch.identifier,touch.clientY,true);
+      document.addEventListener('touchmove',moveTouch,{capture:true,passive:false});
+      document.addEventListener('touchend',endTouch,true);
+      document.addEventListener('touchcancel',endTouch,true);
+    },{passive:false});
     handle.onpointerdown = event => {
-      if (event.button!==0 || drag) return;
+      if (event.pointerType==='touch' || event.button!==0 || drag) return;
       event.preventDefault();
       fields.setPointerCapture(event.pointerId);
-      drag = {row,pointer:event.pointerId,y:event.clientY,before:fieldOrder(),moved:false};
-      row.classList.add('profile-dragging');
-      drag.frame = requestAnimationFrame(scrollWhileDragging);
+      startDrag(row,event.pointerId,event.clientY,false);
     };
     handle.onkeydown = event => {
       if (event.key!=='ArrowUp' && event.key!=='ArrowDown') return;
