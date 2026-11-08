@@ -104,6 +104,9 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
 @media(max-width:360px){.action-grid,.capture-actions{grid-template-columns:1fr}}
 .first-run h2{margin-top:.15rem}
 .first-run .action-card{text-decoration:none}
+.first-run [aria-pressed="true"]{border-color:var(--mint)}
+#first-template-field:not([hidden]){display:block;margin:.75rem 0}
+#first-run [hidden]{display:none!important}
 .first-import{display:inline-flex;align-items:center;min-height:44px}
 .demo-view .inventory-count,.demo-detail>article>:not(.card-heading):not(.demo-manufacturer){display:none!important}
 .inventory-tabs,.first-tools{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
@@ -141,7 +144,7 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
   <p id="home-intro">Deine Rollen, Druckprofile und Trocknung im Blick.</p>
 </header>
 <p id="roll-notice" class="work-panel roll-notice" role="status" hidden></p>
-<nav id="main-menu" class="workshop-dashboard" aria-label="Hauptmenü">
+<nav id="main-menu" hidden class="workshop-dashboard" aria-label="Hauptmenü">
   <a id="menu-scan" class="dashboard-card dashboard-scan" href="#filament-scannen" aria-labelledby="label-scan" aria-describedby="detail-scan">
     <svg class="dashboard-icon" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m13-5h3a2 2 0 0 1 2 2v3M3 16v3a2 2 0 0 0 2 2h3m13-5v3a2 2 0 0 1-2 2h-3M7 12h10m-9-4h2v2H8zm6 6h2v2h-2z"/></svg>
     <strong id="label-scan">QR-Schnellscan</strong>
@@ -164,11 +167,48 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
   </a>
 </nav>
 <section id="first-run" class="work-panel first-run" aria-labelledby="first-run-title" hidden>
-  <h2 id="first-run-title">Dein Filamentlager</h2>
-  <p>Erfasse deine Rollen, damit du Lagerort, Restgewicht und Trocknung im Blick hast. Dein Bestand wird in diesem Browser gespeichert.</p>
-  <div class="action-grid">
-    <a class="action-card action-secondary" href="#beispiele" aria-labelledby="first-demo-title" aria-describedby="first-demo-help"><strong id="first-demo-title">Beispiel ansehen</strong><small id="first-demo-help">Filamentkarten kennenlernen</small></a>
-  </div>
+  <p id="first-run-progress" class="action-note" aria-live="polite">Schritt 1 von 3</p>
+  <h2 id="first-run-title" tabindex="-1">Lege dein erstes Filament an</h2>
+  <form id="first-run-form">
+    <div data-first-step="1">
+      <div class="capture-actions">
+        <button type="button" class="action-card action-secondary" id="first-template" aria-pressed="false"><strong>Aus Vorlage wählen</strong><small>Eine Beispielkarte als Ausgangspunkt nehmen</small></button>
+        <button type="button" class="action-card action-secondary" id="first-manual" aria-pressed="false"><strong>Filament selbst eingeben</strong><small>Mit Material und Farbe beginnen</small></button>
+      </div>
+      <label id="first-template-field" hidden>Vorlage<select name="template"></select></label>
+      <div class="fields" id="first-filament-fields" hidden>
+        <label>Materialart<input name="materialart" list="material-types" maxlength="40" placeholder="z. B. PLA, PETG oder ABS" required></label>
+        <label>Farbe<input name="farbe" maxlength="60" placeholder="z. B. Rot" required></label>
+        <label>Hersteller (optional)<input name="manufacturer" maxlength="40"></label>
+        <label>Produktname (optional)<input name="product" maxlength="60"></label>
+      </div>
+    </div>
+    <div data-first-step="2" hidden>
+      <div class="fields">
+        <label>Anzahl Rollen<input type="number" name="quantity" min="1" max="100" value="1" required></label>
+        <label>Lagerort<select name="place"></select></label>
+        <label id="first-place-name" hidden>Name des neuen Lagerorts<input name="newPlace" maxlength="60"></label>
+      </div>
+      <p class="action-note">Restgewicht, Trocknung und eigene Druckwerte kannst du später auf der Filamentkarte ergänzen.</p>
+    </div>
+    <div data-first-step="3" hidden>
+      <p id="first-review"></p>
+      <p class="action-note">Dein Bestand wird in diesem Browser gespeichert.</p>
+    </div>
+    <div class="role-shortcuts">
+      <button id="first-back" type="button" class="action-secondary" hidden>Zurück</button>
+      <button id="first-next" type="submit" class="action-primary" hidden>Weiter</button>
+    </div>
+    <p id="first-status" role="status"></p>
+  </form>
+  <nav class="role-shortcuts" aria-label="Weitere Einstiege">
+    <a class="role-action-link" href="#datensicherung">Sicherung wiederherstellen</a>
+    <a class="role-action-link" href="#filament-scannen">QR-Code scannen</a>
+  </nav>
+</section>
+<section id="first-run-done" class="work-panel" hidden>
+  <h2 tabindex="-1">Deine erste Rolle ist im Bestand</h2>
+  <a class="role-action-link action-primary" href="#">QR-Etikett anzeigen</a>
 </section>
 <section id="einstellungen" aria-labelledby="page-title" hidden>
   <p>Diese Einstellungen gelten in diesem Browser und werden mit der Datensicherung übertragen.</p>
@@ -464,5 +504,5 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
     <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
 </template>
 <script src="./filament-stock.js"></script>
-<script src="./filament-app.js?v=19"></script>
+<script src="./filament-app.js?v=20"></script>
 </html>

@@ -961,6 +961,7 @@ function prepareCard(card, color, metadata = {}) {
 }
 function addQr(card, packed) {
   const qr = element('details','');
+  qr.className = 'printed-qr';
   qr.append(element('summary','QR-Code zum Nachdrucken'));
   const canvas = element('canvas','');
   canvas.width = canvas.height = 720;
@@ -1718,7 +1719,7 @@ function filter() {
     if (rollNotice.hidden && previousRoute===rollNoticeState?.route) rollNoticeState = null;
   }
   if (single && route.startsWith('etikett/') && route!==previousRoute) {
-    const label = target.querySelector('.local-qr');
+    const label = target.querySelector('.local-qr,.printed-qr');
     if (label) {
       label.open = true;
       requestAnimationFrame(()=>{
@@ -1745,8 +1746,10 @@ function filter() {
   const total = home ? updateDashboardStatus() : 0;
   const firstRun = Boolean(onboarding && home && stockMode==='new' && !total && !rolls.length &&
     ![...cards.querySelectorAll('article[id]')].some(card=>hasRecordedStock(card.id)));
-  menu.hidden = !home;
-  settingsLink.hidden = !home;
+  menu.hidden = !home || firstRun;
+  settingsLink.hidden = !home || firstRun;
+  firstDone.hidden = !home || firstRun || !firstDone.dataset.cardId;
+  if (!home) delete firstDone.dataset.cardId;
   settingsPage.hidden = !settingsView;
   if (settingsView && routeChanged) renderSettings();
   if (home) stockMenuLink.href = '#'+readSettings().inventory;
@@ -2411,15 +2414,8 @@ form.onsubmit = event => {
   const cardId = 'eigene-rolle-'+roll.id;
   const next = editing ? rolls.map(item => item.id === editing ? roll : item) : [...rolls,roll];
   const stockKey = 'filament-bestand:'+cardId;
-  let wroteStock = false;
-  try {
-    if (batch) {
-      localStorage.setItem(stockKey,JSON.stringify(batch));
-      wroteStock = true;
-    }
-    localStorage.setItem(key,JSON.stringify(next));
-  } catch {
-    if (wroteStock) { try { localStorage.removeItem(stockKey); } catch {} }
+  const records = batch ? [[stockKey,batch],[key,next]] : [[key,next]];
+  if (!saveCaptureRecords(records)) {
     status.textContent = 'Speichern in diesem Browser fehlgeschlagen.';
     return;
   }
@@ -2433,6 +2429,153 @@ form.onsubmit = event => {
   if (batch) finishCapture(cardId,batch.length,true);
   else location.hash = returnRoute || 'bestand/'+cardId;
   status.textContent = 'Gespeichert';
+};
+
+function saveCaptureRecords(records) {
+  const written = [];
+  try {
+    for (const [name,value] of records) {
+      const previous = localStorage.getItem(name);
+      localStorage.setItem(name,JSON.stringify(value));
+      written.push([name,previous]);
+    }
+    return true;
+  } catch {
+    for (const [name,previous] of written.reverse()) {
+      try {
+        if (previous===null) localStorage.removeItem(name);
+        else localStorage.setItem(name,previous);
+      } catch {}
+    }
+    return false;
+  }
+}
+
+const firstDone = document.querySelector('#first-run-done');
+const firstForm = document.querySelector('#first-run-form');
+const firstFields = firstForm.elements;
+const firstTitle = document.querySelector('#first-run-title');
+const firstProgress = document.querySelector('#first-run-progress');
+const firstStatus = document.querySelector('#first-status');
+const firstBack = document.querySelector('#first-back');
+const firstNext = document.querySelector('#first-next');
+const firstTemplate = document.querySelector('#first-template');
+const firstManual = document.querySelector('#first-manual');
+const firstFilamentFields = document.querySelector('#first-filament-fields');
+const firstTemplateField = document.querySelector('#first-template-field');
+const firstPlaceName = document.querySelector('#first-place-name');
+const firstReview = document.querySelector('#first-review');
+const firstSteps = [...firstForm.querySelectorAll('[data-first-step]')];
+let firstStep = 1;
+
+firstFields.template.add(new Option('Bitte wählen',''));
+for (const card of cards.querySelectorAll('article[id]:not([data-local])')) {
+  firstFields.template.add(new Option(card.querySelector('h2').textContent+' · '+card.dataset.color,card.id));
+}
+function chooseFirstEntry(template) {
+  firstTemplate.setAttribute('aria-pressed',String(template));
+  firstManual.setAttribute('aria-pressed',String(!template));
+  firstTemplateField.hidden = !template;
+  firstFilamentFields.hidden = template && !firstFields.template.value;
+  firstNext.hidden = firstFilamentFields.hidden;
+  firstStatus.textContent = '';
+  if (template) firstFields.template.focus();
+  else firstFields.materialart.focus();
+}
+firstTemplate.onclick = () => chooseFirstEntry(true);
+firstManual.onclick = () => chooseFirstEntry(false);
+firstFields.template.onchange = () => {
+  const card = document.getElementById(firstFields.template.value);
+  firstFilamentFields.hidden = firstNext.hidden = !card;
+  firstFields.materialart.value = card?.dataset.material ?? '';
+  firstFields.farbe.value = card?.dataset.color ?? '';
+  firstFields.manufacturer.value = '';
+  firstFields.product.value = card?.querySelector('h2').textContent ?? '';
+};
+firstFields.place.onchange = () => {
+  firstPlaceName.hidden = firstFields.place.value!=='new';
+  if (!firstPlaceName.hidden) firstFields.newPlace.focus();
+};
+function showFirstStep(step) {
+  firstStep = step;
+  firstSteps.forEach((panel,index)=>{
+    panel.hidden = index+1!==step;
+    for (const field of panel.querySelectorAll('input,select')) field.disabled = panel.hidden;
+  });
+  firstBack.hidden = step===1;
+  firstNext.textContent = step===3 ? 'Filament und Rolle speichern' : 'Weiter';
+  firstTitle.textContent = ['Lege dein erstes Filament an','Erste Rolle erfassen','Angaben prüfen'][step-1];
+  firstProgress.textContent = 'Schritt '+step+' von 3';
+  firstStatus.textContent = '';
+  firstTitle.focus();
+}
+function firstEntry() {
+  const materialart = firstFields.materialart.value.trim();
+  const farbe = firstFields.farbe.value.trim();
+  const material = [firstFields.manufacturer.value.trim(),firstFields.product.value.trim() || materialart].filter(Boolean).join(' ').slice(0,100);
+  return {materialart,farbe,material};
+}
+function firstLocation() {
+  const places = readLocations();
+  const selection = firstFields.place.value;
+  const name = firstFields.newPlace.value.trim();
+  if (selection==='new') {
+    return places.find(place=>place.name.toLocaleLowerCase('de')===name.toLocaleLowerCase('de')) ?? {name};
+  }
+  return places.find(place=>place.id===selection) ?? {id:'',name:'Später festlegen'};
+}
+firstForm.noValidate = true;
+firstBack.onclick = () => showFirstStep(firstStep-1);
+firstForm.onsubmit = event => {
+  event.preventDefault();
+  if (firstNext.hidden) return;
+  const entry = firstEntry();
+  const count = firstFields.quantity.valueAsNumber;
+  if (firstStep===1) {
+    if (!entry.materialart || !entry.farbe) {
+      firstStatus.textContent = 'Bitte Materialart und Farbe eintragen.';
+      return;
+    }
+    const selected = firstFields.place.value;
+    firstFields.place.replaceChildren(new Option('Später festlegen',''),
+      ...readLocations().map(place=>new Option(place.name,place.id)),new Option('Neuen Lagerort anlegen','new'));
+    if ([...firstFields.place.options].some(option=>option.value===selected)) firstFields.place.value = selected;
+    showFirstStep(2);
+    return;
+  }
+  const place = firstLocation();
+  if (!Number.isInteger(count) || count<1 || count>100 || !place.name) {
+    firstStatus.textContent = 'Bitte prüfe die Rollenanzahl und den Lagerort.';
+    return;
+  }
+  if (firstStep===2) {
+    firstReview.textContent = [entry.material,entry.farbe,batchLabel(count,'').trim(),place.name].join(' · ');
+    showFirstStep(3);
+    return;
+  }
+  const existing = findDuplicateCard(entry.material,entry.farbe);
+  const newCard = existing ? null : {...entry,id:crypto.randomUUID()};
+  const cardId = existing?.id ?? 'eigene-rolle-'+newCard.id;
+  const locationId = place.id ?? crypto.randomUUID();
+  const batch = Array.from({length:count},()=>({id:crypto.randomUUID(),weight:'',packaging:'unknown',locationId}));
+  const records = [['filament-bestand:'+cardId,[...stockForCard(cardId),...batch]]];
+  if (place.id===undefined) records.unshift([locationKey,[...readLocations(),{id:locationId,name:place.name}]]);
+  if (newCard) records.push([key,[...rolls,newCard]]);
+  if (!saveCaptureRecords(records)) {
+    firstStatus.textContent = 'Speichern fehlgeschlagen. Deine Eingaben sind noch vorhanden. Versuche es erneut.';
+    return;
+  }
+  if (newCard) rolls = [...rolls,newCard];
+  if (place.id===undefined) {
+    for (const card of cards.children) card.dispatchEvent(new Event('locations-changed'));
+  }
+  if (existing) existing.dispatchEvent(new Event('stock-batch-added'));
+  firstDone.dataset.cardId = cardId;
+  const doneTitle = firstDone.querySelector('h2');
+  doneTitle.textContent = count===1 ? 'Deine erste Rolle ist im Bestand' : 'Deine ersten '+count+' Rollen sind im Bestand';
+  firstDone.querySelector('a').href = '#etikett/'+cardId;
+  render();
+  doneTitle.focus();
 };
 
 const backupFile = document.querySelector('#backup-file');
