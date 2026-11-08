@@ -23,27 +23,29 @@ function readSettings() {
   } catch {}
   return settingsDefaults;
 }
-function initialStockMode(storage) {
-  try {
-    const saved = storage.getItem(stockModeKey);
-    if (saved==='new' || saved==='legacy') return saved;
-    const legacy = Object.keys(storage).some(name=>name===key ||
-      /^(?:filament-bestand:|filament-x2d:|filament-druckprofil:|filament-spulengewicht:)/.test(name) ||
-      ['filament-lagerorte','filament-lagerorte-reihenfolge','filament-drucker','filament-duesenvarianten','filament-trocknungsintervalle'].includes(name));
-    const mode = legacy ? 'legacy' : 'new';
-    try { storage.setItem(stockModeKey,mode); } catch {}
-    return mode;
-  } catch { return 'new'; }
+function legacyMigrationPending() {
+  const mode = localStorage.getItem(stockModeKey);
+  return mode === 'legacy' || (mode === null && localStorage.getItem(key) !== null);
 }
-let stockMode = 'new';
-try { stockMode = initialStockMode(localStorage); } catch {}
 const dryingIntervalKey = 'filament-trocknungsintervalle';
 const dryingActions = new WeakMap();
 const rollEditors = new WeakMap();
 const labels = {durchmesser:'Durchmesser',gewicht:'Gewicht',druck:'Drucktemperatur',trocknung:'Trocknung'};
-let rolls = [];
+const templateData = new WeakMap();
 let editing = null;
-try { const saved = JSON.parse(localStorage.getItem(key)); if (Array.isArray(saved)) rolls = saved; } catch {}
+function readOwnCards() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(key));
+    if (Array.isArray(saved)) return saved;
+  } catch {}
+  return [];
+}
+let rolls = readOwnCards();
+try {
+  if (!legacyMigrationPending() && localStorage.getItem(stockModeKey)===null) {
+    localStorage.setItem(stockModeKey,'new');
+  }
+} catch {}
 function element(tag, content) {
   const node = document.createElement(tag);
   node.textContent = content;
@@ -166,7 +168,6 @@ function createLocationManager(onChange, feedback, initiallyOpen = false) {
       cancel.className = 'action-secondary';
       cancel.onclick = () => { panel.remove(); trigger.hidden = false; trigger.focus(); };
       confirm.onclick = () => {
-        const written = [];
         try {
           const current = affectedStocks(place.id);
           const locations = readLocations();
@@ -176,16 +177,11 @@ function createLocationManager(onChange, feedback, initiallyOpen = false) {
             feedback.textContent = 'Die Zuordnungen haben sich geändert. Bitte prüfe die Liste erneut.';
             return;
           }
-          for (const entry of current) {
-            const next = entry.stock.map(roll=>roll?.locationId===place.id ? {...roll,locationId:replacement.value} : roll);
-            localStorage.setItem(entry.key,JSON.stringify(next));
-            written.push(entry);
-          }
-          localStorage.setItem(locationKey,JSON.stringify(locations.filter(item=>item.id!==place.id)));
+          const records = current.map(entry=>[entry.key,entry.stock.map(roll=>
+            roll?.locationId===place.id ? {...roll,locationId:replacement.value} : roll)]);
+          records.push([locationKey,locations.filter(item=>item.id!==place.id)]);
+          if (!saveRecords(records)) throw Error();
         } catch {
-          for (const entry of written.reverse()) {
-            try { localStorage.setItem(entry.key,entry.raw); } catch {}
-          }
           feedback.textContent = 'Der Lagerort konnte nicht entfernt werden.';
           return;
         }
@@ -309,6 +305,8 @@ function addLocationSection(card, readStock, saveStock) {
   return {details,refreshAssignments};
 }
 function dryingRecommendations(card) {
+  const template = templateData.get(card);
+  if (template) return template.recommendations;
   if (Object.hasOwn(dryingByDevice,card.id)) return dryingByDevice[card.id];
   const values = [...card.querySelectorAll('dl dt')]
     .filter(field=>field.textContent.startsWith('Trocknung'))
@@ -391,11 +389,12 @@ function addStockSection(card, profile) {
   const packaging = {unknown:'Unbekannt',sealed:'Originalverpackt',opened:'Angebrochen'};
   const readStock = () => stockForCard(card.id);
   function saveStock(next) {
-    try { localStorage.setItem(storageKey,JSON.stringify(next)); }
-    catch { feedback.textContent = 'Der Bestand konnte in diesem Browser nicht gespeichert werden.'; return; }
-    renderStock(next);
-    location.refreshAssignments();
-    filter();
+    if (!saveRecords([[storageKey,next]])) {
+      feedback.textContent = 'Der Bestand konnte in diesem Browser nicht gespeichert werden.';
+      return;
+    }
+    refreshStock(next);
+    refreshStockView(card);
     feedback.textContent = 'Bestand gespeichert.';
     return true;
   }
@@ -446,7 +445,7 @@ function addStockSection(card, profile) {
       weight.disabled = calculating;
       result.hidden = !calculating;
       gross.setCustomValidity(invalid ? 'Gib ein Leergewicht ein, das höchstens so groß wie das Gesamtgewicht ist.' : '');
-      weight.value = calculating ? (hasGross && !invalid ? String(Math.round((Number(gross.value)-Number(empty.value))*1000)/1000) : '') : manual;
+      weight.value = calculating ? (hasGross && !invalid ? String(calculatedRest(gross.value,empty.value)) : '') : manual;
       result.textContent = weight.value && calculating ? 'Berechnetes Restgewicht: '+Number(weight.value).toLocaleString('de')+' g' : 'Berechnetes Restgewicht: –';
     }
     let manual = manualWeight;
@@ -517,8 +516,7 @@ function addStockSection(card, profile) {
         rollNoticeState = priorNotice;
         error.textContent = 'Die Änderungen konnten nicht gespeichert werden.';
       } else if (returnRoute && mode==='move') {
-        const label = mode==='move' ? 'Lagerort' : previous.weight!==updated.weight ? 'Restgewicht' : 'Änderung';
-        returnAfterRollSave(returnRoute,label+' für Rolle '+(index+1)+' gespeichert.');
+        returnAfterRollSave(returnRoute,'Lagerort für Rolle '+(index+1)+' gespeichert.');
       }
     };
     editor.append(error);
@@ -535,7 +533,7 @@ function addStockSection(card, profile) {
       if (!current || !saveStock(stock.filter(item=>item.id!==roll.id))) return;
       removed = current;
       undo.hidden = false;
-      if (availableOnly.checked && card.hidden) { availableOnly.checked = false; filter(); }
+      if (availableOnly.checked && card.hidden) { availableOnly.checked = false; renderRoute(); }
       feedback.textContent = 'Rolle als aufgebraucht markiert.';
     };
     return remove;
@@ -555,6 +553,7 @@ function addStockSection(card, profile) {
   function renderStock(stock) {
     const count = stock.length + (stock.length===1 ? ' Rolle' : ' Rollen');
     card.dataset.stockCount = String(stock.length);
+    card.dataset.recordedStock = String(hasRecordedStock(card.id));
     card.querySelector('.inventory-count').textContent = stock.length===1 ? '1 Rolle im Bestand' : stock.length+' Rollen im Bestand';
     card.querySelector('.detail-stock-summary').textContent = [count,...weightTotals(stock,nominalWeight(card))].join(' · ');
     summary.textContent = 'Rollen im Bestand';
@@ -583,12 +582,14 @@ function addStockSection(card, profile) {
       add.setAttribute('aria-expanded','true');
       editor.querySelector('select').focus();
     };
+    const places = new Map(readLocations().map(place=>[place.id,place.name]));
+    const nominal = nominalWeight(card);
     const rows = stock.map((roll,index)=>{
       const row = element('div','');
       row.className = 'stock-roll-entry';
       const open = rollActionLink(card.id,roll.id,'bestand/'+card.id,'Rolle '+(index+1)+' bearbeiten');
-      const place = readLocations().find(item=>item.id===roll.locationId)?.name ?? 'Ohne Lagerort';
-      row.append(open,element('p',place+' · '+weightDescription(roll,nominalWeight(card))),removeRollButton(roll,index));
+      const place = places.get(roll.locationId) ?? 'Ohne Lagerort';
+      row.append(open,element('p',place+' · '+weightDescription(roll,nominal)),removeRollButton(roll,index));
       return row;
     });
     shortcuts.replaceChildren();
@@ -623,6 +624,7 @@ function addStockSection(card, profile) {
   section.append(summary,element('p','Der Bestand wird in diesem Browser gespeichert. Gib das Restgewicht direkt ein oder wiege die komplette Rolle und trage das Leergewicht ein.'),tareForm,feedback,undo,entries);
   const location = addLocationSection(card,readStock,saveStock);
   rollEditors.set(card,(roll,index,returnRoute,mode)=>{
+    if (mode==='move') return [stockForm(roll,index,returnRoute,mode)];
     const history = dryingHistory(roll,session=>{
       const saved = saveDrying(roll.id,session);
       if (saved) returnAfterRollSave(returnRoute,'Trocknung für Rolle '+(index+1)+' gespeichert.');
@@ -642,20 +644,20 @@ function addStockSection(card, profile) {
     editor.prepend(recommendation,element('p','Tatsächlich getrocknet mit'));
     if (mode==='dry') { history.open = true; return [history]; }
     const form = stockForm(roll,index,returnRoute,mode);
-    return mode==='move' ? [form] : [form,history];
+    return [form,history];
   });
   dryingActions.set(card,{
-    saveDrying,
     markDue(rollId,dryingDue) {
       const current = readStock();
       if (!current.some(item=>item.id===rollId)) return false;
       return saveStock(current.map(item=>item.id===rollId ? {...item,dryingDue} : item));
     }
   });
-  card.addEventListener('stock-batch-added',()=>{
-    renderStock(readStock());
+  function refreshStock(stock) {
+    renderStock(stock);
     location.refreshAssignments();
-  });
+  }
+  card.addEventListener('stock-batch-added',()=>refreshStock(readStock()));
   profile.before(shortcuts);
   profile.after(quickDrying,location.details,section);
   renderStock(readStock());
@@ -742,6 +744,7 @@ function prepareCard(card, color, metadata = {}) {
   card.dataset.colorFamily = colorFamily(color,metadata.farbfamilie);
   const shade = validColor(metadata.farbton) ? metadata.farbton : presetColor(color);
   card.dataset.color = color;
+  card.dataset.searchText = normalizeSearch([title,card.dataset.material,color].join(' '));
   const swatch = makeSwatch(shade);
   const label = card.querySelector('.label');
   label.textContent = color;
@@ -1013,6 +1016,20 @@ for (const card of cards.querySelectorAll('article[id]')) {
   const specs = card.querySelector('dl');
   const sharedSpecs = document.getElementById('specs-' + card.dataset.product);
   if (sharedSpecs) specs.prepend(sharedSpecs.content.cloneNode(true));
+  const recommendations = dryingRecommendations(card);
+  const manufacturerFields = [...specs.querySelectorAll('dt')].map(field=>[
+    field.textContent,field.nextElementSibling.textContent
+  ]);
+  const values = Object.fromEntries(manufacturerFields);
+  templateData.set(card,{
+    recommendations,
+    durchmesser:values.Durchmesser ?? '',
+    gewicht:values.Filamentgewicht ?? values.Gewicht ?? '',
+    druck:values.Düsentemperatur ?? values.Drucktemperatur ?? '',
+    trocknung:recommendations.join(' / '),
+    produktseite:card.querySelector('.product-link a')?.href ?? '',
+    herstellerdaten:JSON.stringify(manufacturerFields)
+  });
   prepareCard(card,card.querySelector('.label').textContent.split(' · ')[1]);
   const manufacturer = element('details','');
   manufacturer.className = 'demo-manufacturer';
@@ -1055,10 +1072,9 @@ for (const card of cards.querySelectorAll('article[id]')) {
   }
   if (drying.length !== 2) continue;
   drying[0].querySelector('dt').textContent = 'Trocknung nach Gerät';
-  const values = dryingRecommendations(card);
   const list = element('ul','');
   const sources = [...manufacturer.querySelectorAll('p:not(.product-link) a[href]')];
-  for (const value of values) {
+  for (const value of recommendations) {
     const item = element('li',value);
     let source = sources[0];
     if (value.includes('französischer EU-Shop')) source = sources.find(link=>link.pathname.startsWith('/fr/')) ?? source;
@@ -1173,8 +1189,7 @@ function stockForCard(cardId) {
     const saved = JSON.parse(localStorage.getItem('filament-bestand:' + cardId));
     if (Array.isArray(saved)) return saved;
   } catch {}
-  const ownCard = cardId.startsWith('eigene-rolle-') && rolls.some(roll=>'eigene-rolle-'+roll.id===cardId);
-  return stockMode==='legacy' || ownCard ? [{id:'erste-rolle',packaging:'unknown',weight:''}] : [];
+  return [];
 }
 const openLocationGroups = new Set();
 const locationOrderKey = 'filament-lagerorte-reihenfolge';
@@ -1199,6 +1214,8 @@ function renderLocationOverview(message = '', managerOpen = false) {
   }
   const selected = new Map();
   const checkboxes = [];
+  const groupsByRoll = new Map();
+  const stockKeyFor = item => JSON.stringify([item.id,item.rollId]);
   const transfer = element('form','');
   transfer.className = 'stock-transfer';
   transfer.hidden = true;
@@ -1276,19 +1293,27 @@ function renderLocationOverview(message = '', managerOpen = false) {
     box.type = 'checkbox';
     label.prepend(box);
     box.onchange = () => {
+      const affected = new Set();
       for (const item of items) {
-        const key = JSON.stringify([item.id,item.rollId]);
-        if (box.checked) selected.set(key,item);
-        else selected.delete(key);
+        const id = stockKeyFor(item);
+        if (box.checked) selected.set(id,item);
+        else selected.delete(id);
+        for (const entry of groupsByRoll.get(id)) affected.add(entry);
       }
-      for (const entry of checkboxes) {
-        const count = entry.items.filter(item=>selected.has(JSON.stringify([item.id,item.rollId]))).length;
+      for (const entry of affected) {
+        const count = entry.items.filter(item=>selected.has(stockKeyFor(item))).length;
         entry.box.checked = count===entry.items.length;
         entry.box.indeterminate = count>0&&count<entry.items.length;
       }
       refreshSelection();
     };
-    checkboxes.push({box,items});
+    const entry = {box,items};
+    checkboxes.push(entry);
+    for (const item of items) {
+      const id = stockKeyFor(item);
+      if (!groupsByRoll.has(id)) groupsByRoll.set(id,[]);
+      groupsByRoll.get(id).push(entry);
+    }
     return label;
   }
   transfer.onsubmit = event => {
@@ -1301,6 +1326,7 @@ function renderLocationOverview(message = '', managerOpen = false) {
       status.textContent = 'Diesen Lagerort gibt es bereits.';
       return;
     }
+    if (newPlace && !newPlace.name) return;
     if (!newPlace && targetId && !places.some(place=>place.id===targetId)) {
       status.textContent = 'Dieser Lagerort ist nicht mehr vorhanden. Öffne die Lagerortübersicht erneut.';
       return;
@@ -1320,23 +1346,16 @@ function renderLocationOverview(message = '', managerOpen = false) {
       moved++;
     }
     if (!moved) { status.textContent = 'Die ausgewählten Rollen sind bereits an diesem Lagerort.'; return; }
-    const written = [];
-    try {
-      for (const [id,stock] of changes) {
-        const key = 'filament-bestand:'+id;
-        const before = localStorage.getItem(key);
-        localStorage.setItem(key,JSON.stringify(stock));
-        written.push({key,before});
-      }
-      if (newPlace) localStorage.setItem(locationKey,JSON.stringify([...places,newPlace]));
-    } catch {
-      for (const {key,before} of written.reverse()) {
-        try { if (before===null) localStorage.removeItem(key); else localStorage.setItem(key,before); } catch {}
-      }
+    const records = [...changes].map(([id,stock])=>['filament-bestand:'+id,stock]);
+    if (newPlace) records.unshift([locationKey,[...places,newPlace]]);
+    if (!saveRecords(records)) {
       status.textContent = 'Die Umlagerung konnte nicht gespeichert werden.';
       return;
     }
-    for (const card of cards.children) card.dispatchEvent(new Event('locations-changed'));
+    for (const card of cards.children) {
+      if (changes.has(card.id)) card.dispatchEvent(new Event('stock-batch-added'));
+      else if (newPlace) card.dispatchEvent(new Event('locations-changed'));
+    }
     openLocationGroups.add(targetId);
     renderLocationOverview(moved===1?'1 Rolle umgelagert.':moved+' Rollen umgelagert.');
   };
@@ -1685,7 +1704,7 @@ function updateDashboardStatus() {
   }
   return total;
 }
-function filter() {
+function renderRoute() {
   const route = location.hash.slice(1);
   const routeChanged = route!==previousRoute;
   const roleView = route.startsWith('rolle/');
@@ -1770,12 +1789,12 @@ function filter() {
   const settingsView = route==='einstellungen';
   const home = !settingsView && !roleView && !single && !locationsView && !inventoryView && !createView && !scanningView && !printersView && !backupView && !dryingView && !missingLocalCard && !resultView && !demoList;
   printerView.hidden = !printersView;
-  if (printersView) renderPrinters();
+  if (printersView && routeChanged) renderPrinters();
   const onboarding = document.querySelector('#first-run');
   const demoNotice = document.querySelector('#demo-notice');
   const total = home ? updateDashboardStatus() : 0;
-  const firstRun = Boolean(onboarding && home && stockMode==='new' && !total && !rolls.length &&
-    ![...cards.querySelectorAll('article[id]')].some(card=>hasRecordedStock(card.id)));
+  const firstRun = Boolean(onboarding && home && !total && !rolls.length &&
+    ![...cards.querySelectorAll('article[id]')].some(card=>card.dataset.recordedStock==='true'));
   menu.hidden = !home || firstRun;
   settingsLink.hidden = !home || firstRun;
   firstDone.hidden = !home || firstRun || !firstDone.dataset.cardId;
@@ -1784,6 +1803,7 @@ function filter() {
   if (settingsView && routeChanged) renderSettings();
   if (home) stockMenuLink.href = '#'+readSettings().inventory;
   if (onboarding) onboarding.hidden = !firstRun;
+  if (backupView && routeChanged) renderLegacyMigration();
   if (demoNotice) demoNotice.hidden = !demoList && !demoDetail;
   overview.hidden = !inventoryView;
   const tabs = document.querySelector('#inventory-tabs');
@@ -1835,7 +1855,6 @@ function filter() {
   if (dryingDashboard) dryingDashboard.hidden = !dryingView;
   if (dryingView) renderDryingDashboard();
   if (locationsView) renderLocationOverview();
-  const terms = normalizeSearch(search.value).split(' ').filter(Boolean);
   for (const card of cards.children) {
     const cardTitle = card.querySelector('h2');
     const isActive = single && card===target;
@@ -1852,51 +1871,62 @@ function filter() {
       openCard.hidden = single;
       openCard.href = '#'+(demoList?'beispiel/':'bestand/')+card.id;
     }
-    const name = cardTitle?.textContent ?? '';
-    const searchable = normalizeSearch([name,card.dataset.material,card.dataset.color].join(' '));
-    const matches = terms.every(term=>searchable.includes(term));
-    const demoOnly = inventoryView && stockMode==='new' && !card.hasAttribute('data-local') && !hasRecordedStock(card.id);
-    card.hidden = single ? card !== target : demoList ? card.hasAttribute('data-local') || !card.id : demoOnly || !matches || (availableOnly.checked && card.dataset.stockCount === '0') || (materialFilter.value && card.dataset.material !== materialFilter.value) || (colorFilter.value && card.dataset.colorFamily !== colorFilter.value);
+    card.hidden = single ? card !== target : demoList ? card.hasAttribute('data-local') || !card.id : true;
+  }
+  if (inventoryView) filterInventory();
+  else document.querySelector('#empty').hidden = true;
+}
+function filterInventory() {
+  const terms = normalizeSearch(search.value).split(' ').filter(Boolean);
+  const material = materialFilter.value;
+  const color = colorFilter.value;
+  let hasCards = false;
+  let visible = false;
+  for (const card of cards.children) {
+    const owned = card.id && (card.hasAttribute('data-local') || card.dataset.recordedStock==='true');
+    hasCards ||= Boolean(owned);
+    card.hidden = !owned || !terms.every(term=>card.dataset.searchText.includes(term)) ||
+      (availableOnly.checked && card.dataset.stockCount==='0') ||
+      (material && card.dataset.material!==material) || (color && card.dataset.colorFamily!==color);
+    visible ||= !card.hidden;
   }
   const empty = document.querySelector('#empty');
-  const visible = [...cards.children].some(card=>!card.hidden);
-  empty.hidden = !inventoryView || visible;
-  if (inventoryView && !visible) {
-    const hasStock = [...cards.querySelectorAll('article[id]')].some(card=>stockForCard(card.id).length || hasRecordedStock(card.id) || card.hasAttribute('data-local'));
-    const action = element(hasStock?'button':'a',hasStock?'Filter zurücksetzen':'Erste Rolle erfassen');
-    if (hasStock) {
+  empty.hidden = visible;
+  if (!visible) {
+    const action = element(hasCards?'button':'a',hasCards?'Filter zurücksetzen':'Erste Rolle erfassen');
+    if (hasCards) {
       action.type = 'button';
       action.className = 'action-secondary';
-      action.onclick = () => { search.value = materialFilter.value = colorFilter.value = ''; availableOnly.checked = false; filter(); };
+      action.onclick = () => { search.value = materialFilter.value = colorFilter.value = ''; availableOnly.checked = false; filterInventory(); };
     } else {
       action.href = '#filament-anlegen';
       action.onclick = () => { clearEditor(); showCapture('new'); colorPicker.open = true; };
     }
-    empty.replaceChildren(element('p',hasStock?'Keine Treffer für diese Filter.':'Noch keine Rollen erfasst.'),action);
+    empty.replaceChildren(element('p',hasCards?'Keine Treffer für diese Filter.':'Noch keine Rollen erfasst.'),action);
   }
 }
-materialFilter.onchange = colorFilter.onchange = availableOnly.onchange = filter;
+function refreshStockView(card) {
+  const route = location.hash.slice(1);
+  if (route==='filament-bestand') filterInventory();
+  else if (route==='bestand-lagerort') renderLocationOverview();
+  else if (route==='trocknung') renderDryingDashboard();
+  else if (!route) renderRoute();
+  else if (route.startsWith('rolle/')) {
+    const item = resolveRollRoute(route);
+    if (item?.card===card) renderRolePanel(item);
+    const notice = rollNoticeState?.route===route ? rollNoticeState.message : '';
+    rollNotice.textContent = notice;
+    rollNotice.hidden = !notice;
+  }
+}
+materialFilter.onchange = colorFilter.onchange = availableOnly.onchange = filterInventory;
 window.addEventListener('hashchange', () => {
   const route = location.hash.slice(1);
-  filter();
+  renderRoute();
   requestAnimationFrame(()=>{
     if (location.hash.slice(1)===route && !route.startsWith('etikett/')) window.scrollTo(0,scrollPositions.get(route) ?? 0);
   });
 });
-function updateLocalCardColor(card,roll) {
-  card.dataset.color = roll.farbe;
-  card.dataset.colorFamily = colorFamily(roll.farbe,roll.farbfamilie);
-  const heading = card.querySelector('.card-heading');
-  heading.querySelector('.label').textContent = roll.farbe;
-  heading.querySelector('.swatch')?.remove();
-  const shade = validColor(roll.farbton) ? roll.farbton : presetColor(roll.farbe);
-  if (shade) heading.prepend(makeSwatch(shade));
-  card.querySelectorAll('.local-qr').forEach(section=>section.remove());
-  addLocalQr(card,roll,true);
-  addLocalQr(card,roll);
-  updateFilterOptions();
-  filter();
-}
 function render() {
   cards.querySelectorAll('[data-local]').forEach(card => card.remove());
   for (const roll of rolls) {
@@ -1911,6 +1941,16 @@ function render() {
       item.append(element('dt',title),element('dd',roll[field] || 'Nicht angegeben'));
       specs.append(item);
     }
+    try {
+      const copied = JSON.parse(roll.herstellerdaten ?? '[]');
+      const primary = /^(Durchmesser|Filamentgewicht|Gewicht|Düsentemperatur|Drucktemperatur|Trocknung)/;
+      for (const [title,value] of copied) {
+        if (primary.test(title)) continue;
+        const item = element('div','');
+        item.append(element('dt',title),element('dd',value));
+        specs.append(item);
+      }
+    } catch {}
     const edit = element('button','Filament bearbeiten');
     edit.onclick = () => {
       editReturnRoute = location.hash.slice(1) === 'filament-bestand' ? 'bestand/'+card.id : location.hash.slice(1);
@@ -1921,7 +1961,7 @@ function render() {
       colorPicker.open = false;
       updateColorPalette();
       location.hash = 'filament-anlegen';
-      filter();
+      renderRoute();
       reset.hidden = false;
       status.textContent = '';
       updateCardSave();
@@ -1937,7 +1977,7 @@ function render() {
     cards.append(card);
   }
   updateFilterOptions();
-  filter();
+  renderRoute();
 }
 const colorDraftKey = 'filament-farbentwurf';
 function readColorDraft() {
@@ -1980,7 +2020,7 @@ for (const [name,hex] of Object.entries(colors)) {
   circle.setAttribute('aria-hidden','true');
   button.append(circle,name);
   button.onclick = () => {
-    saveSelectedColor(name);
+    selectDraftColor(name);
   };
   palette.append(button);
 }
@@ -2095,7 +2135,7 @@ function renderScanResult(card,id) {
   again.type = 'button';
   again.onclick = () => {
     history.pushState(null,'','#filament-scannen');
-    filter();
+    renderRoute();
     window.scrollTo(0,0);
     scanOpen.focus();
   };
@@ -2286,10 +2326,7 @@ function updateBatchSubmit() {
 }
 function renderCaptureMatches() {
   const terms = normalizeSearch(query.value).split(' ').filter(Boolean);
-  const matches = [...cards.querySelectorAll('article[id]')].filter(card=>{
-    const text = normalizeSearch([card.querySelector('h2').textContent,card.dataset.material,card.dataset.color].join(' '));
-    return terms.every(term=>text.includes(term));
-  });
+  const matches = [...cards.querySelectorAll('article[id]')].filter(card=>terms.every(term=>card.dataset.searchText.includes(term)));
   if (!matches.some(card=>card.id===selectedCard)) selectedCard = '';
   const owned = [];
   const examples = [];
@@ -2303,7 +2340,7 @@ function renderCaptureMatches() {
       updateBatchSubmit();
       existingBatch.quantity.focus();
     };
-    (card.hasAttribute('data-local') || hasRecordedStock(card.id) || stockForCard(card.id).length ? owned : examples).push(button);
+    (card.hasAttribute('data-local') || card.dataset.recordedStock==='true' ? owned : examples).push(button);
   }
   results.replaceChildren(...owned);
   templateResults.replaceChildren(...examples);
@@ -2380,8 +2417,10 @@ batchForm.onsubmit = event => {
     batchStatus.textContent = 'Prüfe Filamentkarte, Anzahl und Lagerort.';
     return;
   }
-  try { localStorage.setItem('filament-bestand:'+card.id,JSON.stringify([...stockForCard(card.id),...batch])); }
-  catch { batchStatus.textContent = 'Die Rollen konnten nicht gespeichert werden.'; return; }
+  if (!saveRecords([appendStockRecord(card.id,batch)])) {
+    batchStatus.textContent = 'Die Rollen konnten nicht gespeichert werden.';
+    return;
+  }
   card.dispatchEvent(new Event('stock-batch-added'));
   batchForm.reset();
   selectedCard = '';
@@ -2394,41 +2433,21 @@ form.elements.produktseite.addEventListener('invalid',()=>{
   if (extra) extra.open = true;
 });
 
-function findDuplicateCard(material,color) {
+function findDuplicateCard(material,color,type) {
   const normalize = value => value.normalize('NFKC').trim().toLocaleLowerCase('de').replace(/\s+/g,' ');
-  return [...cards.children].find(card => card.id !== 'eigene-rolle-' + editing && normalize(card.querySelector('h2').textContent) === normalize(material) && normalize(card.dataset.color) === normalize(color));
+  const identity = [material,color,materialType(material,type)].map(normalize);
+  return [...cards.querySelectorAll('article[id]')].find(card =>
+    card.id !== 'eigene-rolle-'+editing &&
+    [card.querySelector('h2').textContent,card.dataset.color,card.dataset.material]
+      .every((value,index)=>normalize(value)===identity[index]));
 }
-function saveSelectedColor(name) {
-  const saved = rolls.find(roll=>roll.id===editing);
-  if (editing && !saved) {
-    status.textContent = 'Die Filamentkarte ist nicht mehr vorhanden.';
-    return;
-  }
-  if (saved && findDuplicateCard(saved.material,name)) {
-    status.textContent = 'Für dieses Filament gibt es bereits eine Karte in dieser Farbe.';
-    return;
-  }
-  const changed = saved && (saved.farbe!==name || saved.farbton || saved.farbfamilie);
-  const next = saved ? rolls.map(roll=>roll.id===saved.id ? {...roll,farbe:name,farbton:'',farbfamilie:''} : roll) : rolls;
-  try {
-    if (!saved) localStorage.setItem(colorDraftKey,name);
-    else if (changed) localStorage.setItem(key,JSON.stringify(next));
-  } catch {
-    status.textContent = 'Die Farbe konnte in diesem Browser nicht gespeichert werden.';
-    return;
-  }
-  if (changed) {
-    rolls = next;
-    const card = document.getElementById('eigene-rolle-'+saved.id);
-    if (card) updateLocalCardColor(card,next.find(roll=>roll.id===saved.id));
-    else render();
-  }
+function selectDraftColor(name) {
   colorInput.value = name;
   shadeInput.value = '';
   form.elements.farbfamilie.value = '';
   updateColorPalette();
   updateCardSave();
-  status.textContent = saved ? 'Farbe gespeichert.' : 'Farbe für die neue Filamentkarte vorgemerkt.';
+  status.textContent = 'Farbe ausgewählt. Sie wird mit der Filamentkarte gespeichert.';
 }
 function clearEditor() {
   editing = null;
@@ -2445,7 +2464,7 @@ reset.onclick = () => {
   clearEditor();
   status.textContent = '';
   if (returnRoute) location.hash = returnRoute;
-  else filter();
+  else renderRoute();
 };
 form.onsubmit = event => {
   event.preventDefault();
@@ -2454,7 +2473,8 @@ form.onsubmit = event => {
   if (!editing && !fields.materialart) { status.textContent = 'Bitte eine Materialart angeben.'; form.elements.materialart.focus(); return; }
   if (!fields.material || !fields.farbe) { status.textContent = 'Bitte Material und Farbe eintragen.'; return; }
   if (fields.produktseite && !productPage(fields.produktseite)) { status.textContent = 'Gib eine gültige Produktadresse mit https:// oder http:// ein.'; return; }
-  const duplicate = findDuplicateCard(fields.material,fields.farbe);
+  const duplicate = findDuplicateCard(fields.material,fields.farbe,fields.materialart);
+  if (duplicate && editing) { status.textContent = 'Für dieses Filament gibt es bereits eine Karte in dieser Farbe.'; return; }
   if (duplicate) {
     const show = element('button','Rollen zur vorhandenen Karte hinzufügen');
     show.type = 'button';
@@ -2473,12 +2493,15 @@ form.onsubmit = event => {
   const returnRoute = editing ? editReturnRoute : '';
   const batch = editing ? null : makeBatch(createBatch);
   if (!editing && !batch) { status.textContent = 'Prüfe Anzahl und Lagerort.'; return; }
-  const roll = {...fields,id:editing ?? crypto.randomUUID()};
+  const currentCards = readOwnCards();
+  const existing = currentCards.find(item=>item.id===editing);
+  if (editing && !existing) { status.textContent = 'Die Filamentkarte ist nicht mehr vorhanden.'; return; }
+  const roll = {...existing,...fields,id:editing ?? crypto.randomUUID()};
   const cardId = 'eigene-rolle-'+roll.id;
-  const next = editing ? rolls.map(item => item.id === editing ? roll : item) : [...rolls,roll];
+  const next = editing ? currentCards.map(item => item.id === editing ? roll : item) : [...currentCards,roll];
   const stockKey = 'filament-bestand:'+cardId;
   const records = batch ? [[stockKey,batch],[key,next]] : [[key,next]];
-  if (!saveCaptureRecords(records)) {
+  if (!saveRecords(records)) {
     status.textContent = 'Speichern in diesem Browser fehlgeschlagen.';
     return;
   }
@@ -2494,12 +2517,19 @@ form.onsubmit = event => {
   status.textContent = 'Gespeichert';
 };
 
-function saveCaptureRecords(records) {
+function appendStockRecord(cardId,batch) {
+  return ['filament-bestand:'+cardId,[...stockForCard(cardId),...batch]];
+}
+function saveRecords(records) {
+  return writeStorage(records.map(([name,value])=>[name,JSON.stringify(value)]));
+}
+function writeStorage(records) {
   const written = [];
   try {
     for (const [name,value] of records) {
       const previous = localStorage.getItem(name);
-      localStorage.setItem(name,JSON.stringify(value));
+      if (value===null) localStorage.removeItem(name);
+      else localStorage.setItem(name,value);
       written.push([name,previous]);
     }
     return true;
@@ -2634,20 +2664,23 @@ firstForm.onsubmit = event => {
     showFirstStep(3);
     return;
   }
-  const match = findDuplicateCard(entry.material,entry.farbe);
-  const existing = match?.dataset.material.toLocaleLowerCase('de')===entry.materialart.toLocaleLowerCase('de') ? match : null;
-  const newCard = existing ? null : {...entry,id:crypto.randomUUID()};
+  const existing = findDuplicateCard(entry.material,entry.farbe,entry.materialart);
+  const source = firstTemplate.getAttribute('aria-pressed')==='true'
+    ? templateData.get(document.getElementById(firstFields.template.value)) : null;
+  const {recommendations,...metadata} = source ?? {};
+  const newCard = existing ? null : {...metadata,...entry,id:crypto.randomUUID()};
   const cardId = existing?.id ?? 'eigene-rolle-'+newCard.id;
   const locationId = place.id ?? crypto.randomUUID();
   const batch = Array.from({length:count},()=>({id:crypto.randomUUID(),weight:'',packaging:'unknown',locationId}));
-  const records = [['filament-bestand:'+cardId,[...stockForCard(cardId),...batch]]];
+  const records = [appendStockRecord(cardId,batch)];
   if (place.id===undefined) records.unshift([locationKey,[...readLocations(),{id:locationId,name:place.name}]]);
-  if (newCard) records.push([key,[...rolls,newCard]]);
-  if (!saveCaptureRecords(records)) {
+  const nextCards = newCard ? [...readOwnCards(),newCard] : rolls;
+  if (newCard) records.push([key,nextCards]);
+  if (!saveRecords(records)) {
     firstStatus.textContent = 'Speichern fehlgeschlagen. Deine Eingaben sind noch vorhanden. Versuche es erneut.';
     return;
   }
-  if (newCard) rolls = [...rolls,newCard];
+  rolls = nextCards;
   if (place.id===undefined) {
     for (const card of cards.children) card.dispatchEvent(new Event('locations-changed'));
   }
@@ -2706,33 +2739,115 @@ function validateBackup(data) {
   }
   return data.records;
 }
-function backupPlan(records) {
-  const changes = [];
-  for (const [name,value] of Object.entries(records)) {
-    const before = localStorage.getItem(name);
-    if (name!==key && name!==locationKey && name!==printerKey && name!==nozzleVariantKey) {
-      if (before!==value) changes.push({name,before,value,conflict:before!==null});
+function personalRecords() {
+  return Object.fromEntries(Object.keys(localStorage).filter(personalKey)
+    .map(name=>[name,localStorage.getItem(name)]));
+}
+function backupPlan(records,current = personalRecords(),mode = 'keep') {
+  const final = mode==='restore' ? {} : {...current};
+  const conflicts = [];
+  let added = 0;
+  for (const [name,raw] of Object.entries(records)) {
+    const before = current[name];
+    if (raw===before) {
+      final[name] = raw;
       continue;
     }
-    const current = JSON.parse(before??'[]');
-    const imported = JSON.parse(value);
-    const merged = new Map(current.map(item=>[item.id,item]));
-    for (const item of imported) {
-      const previous = merged.get(item.id);
-      if (JSON.stringify(previous)!==JSON.stringify(item)) changes.push({name,id:item.id,value:item,conflict:previous!==undefined});
+    const collection = [key,locationKey,printerKey,nozzleVariantKey].includes(name) ||
+      name.startsWith('filament-bestand:');
+    if (collection && mode!=='restore') {
+      const merged = new Map(JSON.parse(before??'[]').map(item=>[item.id,item]));
+      for (const item of JSON.parse(raw)) {
+        const previous = merged.get(item.id);
+        if (JSON.stringify(previous)===JSON.stringify(item)) continue;
+        if (previous) conflicts.push({name,id:item.id});
+        else added++;
+        if (!previous || mode==='replace') merged.set(item.id,item);
+      }
+      final[name] = JSON.stringify([...merged.values()]);
+    } else {
+      if (before!==undefined) conflicts.push({name});
+      else added++;
+      if (before===undefined || mode!=='keep') final[name] = raw;
     }
   }
-  return changes;
+  const changes = new Set(Object.keys(records));
+  const issues = validateBackupReferences(final,changes);
+  const writes = [...new Set([...Object.keys(current),...Object.keys(final)])]
+    .filter(name=>current[name]!==final[name]).map(name=>[name,final[name]??null]);
+  return {writes,conflicts,added,issues};
+}
+function validateBackupReferences(records,imported) {
+  const ids = (name,prefix = '') => new Set(JSON.parse(records[name]??'[]').map(item=>prefix+item.id));
+  const locations = ids(locationKey);
+  const ownCards = ids(key,'eigene-rolle-');
+  const issues = [];
+  for (const [name,raw] of Object.entries(records)) {
+    if (!name.startsWith('filament-bestand:')) continue;
+    const cardId = name.slice('filament-bestand:'.length);
+    const title = document.getElementById(cardId)?.querySelector('h2')?.textContent ??
+      JSON.parse(records[key]??'[]').find(item=>'eigene-rolle-'+item.id===cardId)?.material ?? cardId;
+    if (localCardPattern.test(cardId) && !ownCards.has(cardId)) {
+      issues.push('Filamentkarte fehlt für „'+title+'“.');
+      continue;
+    }
+    const stock = JSON.parse(raw);
+    let normalized = false;
+    for (const [index,roll] of stock.entries()) {
+      if (roll.locationId && !locations.has(roll.locationId)) {
+        issues.push(title+' · Rolle '+(index+1)+': Lagerort „'+roll.locationId+'“ fehlt.');
+      }
+      if (imported.has(name) && roll.gross) {
+        const weight = String(calculatedRest(roll.gross,roll.tare));
+        if (weight!==roll.weight) {
+          roll.weight = weight;
+          normalized = true;
+        }
+      }
+    }
+    if (normalized) records[name] = JSON.stringify(stock);
+  }
+  return issues;
+}
+function renderLegacyMigration() {
+  const panel = document.querySelector('#legacy-migration');
+  try { panel.hidden = !legacyMigrationPending(); }
+  catch { panel.hidden = true; }
+  if (panel.hidden) return;
+  const candidates = [...cards.querySelectorAll('article[id]')].filter(card=>!hasRecordedStock(card.id));
+  const choices = panel.querySelector('fieldset');
+  choices.replaceChildren(element('legend','Mögliche Rollen aus älteren Versionen'));
+  for (const card of candidates) {
+    const box = element('input','');
+    box.type = 'checkbox';
+    box.value = card.id;
+    const label = element('label',' '+card.querySelector('h2').textContent+' · '+card.dataset.color);
+    label.prepend(box);
+    choices.append(label);
+  }
+  if (!candidates.length) choices.append(element('p','Alle Karten haben bereits einen gespeicherten Bestand.'));
+  panel.onsubmit = event => {
+    event.preventDefault();
+    const records = [...choices.querySelectorAll('input:checked')]
+      .filter(box=>!hasRecordedStock(box.value))
+      .map(box=>['filament-bestand:'+box.value,[
+        {id:'erste-rolle',packaging:'unknown',weight:''}
+      ]]);
+    if (!writeStorage([...records.map(([name,value])=>[name,JSON.stringify(value)]),[stockModeKey,'new']])) {
+      backupStatus.textContent = 'Die Altbestandsprüfung konnte nicht gespeichert werden.';
+      return;
+    }
+    for (const [name] of records) document.getElementById(name.slice('filament-bestand:'.length))
+      ?.dispatchEvent(new Event('stock-batch-added'));
+    panel.hidden = true;
+    backupStatus.textContent = records.length
+      ? batchLabel(records.length,'aus dem Altbestand übernommen.')
+      : 'Altbestandsprüfung abgeschlossen.';
+  };
 }
 document.querySelector('#backup-export').onclick = () => {
   try {
-    const records = Object.fromEntries(Object.keys(localStorage).filter(personalKey).map(name=>[name,localStorage.getItem(name)]));
-    if (stockMode==='legacy') {
-      for (const card of cards.querySelectorAll('article[id]')) {
-        const name = 'filament-bestand:'+card.id;
-        if (!Object.hasOwn(records,name)) records[name] = JSON.stringify(stockForCard(card.id));
-      }
-    }
+    const records = personalRecords();
     const url = URL.createObjectURL(new Blob([JSON.stringify({version:1,records},null,2)],{type:'application/json'}));
     const download = element('a','');
     download.href = url;
@@ -2742,64 +2857,69 @@ document.querySelector('#backup-export').onclick = () => {
     backupStatus.textContent = 'Sicherungsdatei erstellt.';
   } catch { backupStatus.textContent = 'Die Sicherung konnte nicht erstellt werden.'; }
 };
+const backupMode = document.querySelector('#backup-mode');
+const backupConfirm = document.querySelector('#backup-confirm');
+const backupApply = document.querySelector('#backup-import');
+function showBackupPlan() {
+  const restoring = backupMode.value==='restore';
+  backupConflict.closest('label').hidden = restoring;
+  backupConfirm.closest('label').hidden = !restoring;
+  const plan = backupPlan(incomingBackup,personalRecords(),restoring ? 'restore' : backupConflict.value);
+  const list = document.querySelector('#backup-stock-conflicts');
+  const messages = [...plan.issues];
+  for (const {name,id} of plan.conflicts) {
+    if (!id || !name.startsWith('filament-bestand:')) continue;
+    const cardId = name.slice('filament-bestand:'.length);
+    const card = document.getElementById(cardId);
+    const title = card ? [card.querySelector('h2').textContent,card.dataset.color].join(' · ') : cardId;
+    const index = stockForCard(cardId).findIndex(roll=>roll.id===id);
+    messages.push(title+' · Konflikt bei Rolle '+(index+1)+'.');
+  }
+  list.hidden = !messages.length;
+  list.replaceChildren(...messages.map(message=>element('li',message)));
+  const removals = plan.writes.filter(([,value])=>value===null).length;
+  backupStatus.textContent = plan.issues.length ? 'Die Sicherung kann so nicht übernommen werden. Prüfe die fehlenden Zuordnungen.' :
+    restoring ? 'Vollständige Wiederherstellung · '+removals+' gespeicherte Datensätze entfallen. Einträge in der Datei ersetzen die vorhandenen Daten.' :
+      'Vorschau · '+plan.added+' neue Einträge · '+plan.conflicts.length+' Konflikte.';
+  backupApply.disabled = !plan.writes.length || Boolean(plan.issues.length) || (restoring && !backupConfirm.checked);
+  return plan;
+}
+for (const control of [backupMode,backupConflict,backupConfirm]) control.onchange = () => {
+  if (control===backupMode) backupConfirm.checked = false;
+  if (incomingBackup) showBackupPlan();
+};
 backupFile.onchange = async () => {
   incomingBackup = null;
   backupPreview.hidden = true;
   const file = backupFile.files[0];
   if (!file) return;
   try {
-    if (file.size > 2000000) throw Error();
     const parsed = validateBackup(JSON.parse(await file.text()));
     if (backupFile.files[0]!==file) return;
-    const plan = backupPlan(parsed);
-    incomingBackup = parsed;
-    const conflicts = plan.filter(item=>item.conflict).length;
-    const list = document.querySelector('#backup-stock-conflicts');
-    if (list) {
-      const entries = plan.filter(item=>item.conflict && item.name.startsWith('filament-bestand:'));
-      list.hidden = !entries.length;
-      list.replaceChildren(...entries.map(item=>{
-        const cardId = item.name.slice('filament-bestand:'.length);
-        const card = document.getElementById(cardId);
-        const title = card ? [card.querySelector('h2').textContent,card.dataset.color].filter(Boolean).join(' · ') : cardId;
-        const before = JSON.parse(item.before).length;
-        const after = JSON.parse(item.value).length;
-        const count = n => n===1 ? '1 Rolle' : n+' Rollen';
-        return element('li',title+' · Vorhanden: '+count(before)+' · Sicherung: '+count(after)+'. Bei Übernahme wird die gesamte Rollenliste ersetzt.');
-
-      }));
-    }
-    backupStatus.textContent = plan.length ? 'Vorschau: '+(plan.length-conflicts)+' neue Einträge, '+conflicts+' Konflikte mit vorhandenen Einträgen.' : 'Die Sicherung enthält keine Änderungen.';
+    backupMode.value = 'merge';
     backupConflict.value = 'keep';
-    backupPreview.hidden = !plan.length;
-  } catch { backupStatus.textContent = 'Die Datei ist keine gültige Sicherung für Filament Bestand.'; }
+    backupConfirm.checked = false;
+    incomingBackup = parsed;
+    showBackupPlan();
+    backupPreview.hidden = false;
+  } catch {
+    if (backupFile.files[0]!==file) return;
+    incomingBackup = null;
+    backupStatus.textContent = 'Die Datei ist keine gültige Sicherung für die Filamentbibliothek.';
+  }
 };
-document.querySelector('#backup-import').onclick = () => {
+backupApply.onclick = () => {
   if (!incomingBackup) return;
-  const written = [];
   try {
-    const plan = backupPlan(incomingBackup).filter(item=>!item.conflict || backupConflict.value==='replace');
-    const writes = plan.filter(item=>item.name!==key && item.name!==locationKey && item.name!==printerKey && item.name!==nozzleVariantKey);
-    for (const name of [key,locationKey,printerKey,nozzleVariantKey]) {
-      const importedItems = plan.filter(item=>item.name===name);
-      if (!importedItems.length) continue;
-      const before = localStorage.getItem(name);
-      const merged = new Map(JSON.parse(before??'[]').map(item=>[item.id,item]));
-      for (const item of importedItems) merged.set(item.id,item.value);
-      writes.push({name,before,value:JSON.stringify([...merged.values()])});
-    }
-    for (const item of writes) {
-      localStorage.setItem(item.name,item.value);
-      written.push(item);
-    }
+    const {writes} = showBackupPlan();
+    if (backupApply.disabled) return;
+    if (backupMode.value==='restore') writes.push([stockModeKey,'new']);
+    if (!writeStorage(writes)) throw Error();
     backupPreview.hidden = true;
     incomingBackup = null;
     backupStatus.textContent = 'Sicherung übernommen. Die Seite wird neu geladen.';
     location.reload();
   } catch {
-    for (const item of written.reverse()) {
-      try { if (item.before===null) localStorage.removeItem(item.name); else localStorage.setItem(item.name,item.before); } catch {}
-    }
     backupStatus.textContent = 'Die Sicherung konnte nicht vollständig übernommen werden.';
   }
 };
@@ -2814,6 +2934,7 @@ const scanCanvas = element('canvas','');
 const scanContext = scanCanvas.getContext('2d',{willReadFrequently:true});
 let scannerLibrary, scanStream, scanTimer;
 let scanSession = 0;
+let photoRequest = 0;
 function loadScanner() {
   if (!scannerLibrary) scannerLibrary = new Promise((resolve,reject) => {
     const script = element('script','');
@@ -2856,7 +2977,7 @@ function openScannedFilament(code) {
   if (!route.startsWith(sharedPrefix) && !/^eigene-rolle-[a-f0-9-]{36}$/i.test(route) && document.getElementById(route)?.parentElement!==cards) return false;
   closeScanner();
   const result = '#'+scanResultPrefix+route;
-  if (location.hash===result) filter();
+  if (location.hash===result) renderRoute();
   else location.hash = result;
   window.scrollTo(0,0);
   return true;
@@ -2907,27 +3028,29 @@ scanPhoto.onchange = async () => {
   const file = scanPhoto.files[0];
   if (!file) return;
   const session = scanSession;
+  const request = ++photoRequest;
+  const active = () => session===scanSession && request===photoRequest;
   const url = URL.createObjectURL(file);
   scanStatus.textContent = 'QR-Foto wird gelesen …';
   try {
     const image = new Image();
     image.src = url;
     await Promise.all([loadScanner(),image.decode()]);
-    if (session!==scanSession) return;
+    if (!active()) return;
     const code = readQr(image,image.naturalWidth,image.naturalHeight,1600);
     if (code && openScannedFilament(code)) return;
     scanStatus.textContent = code ? 'Dieser QR-Code gehört nicht zum Filamentlager.' : 'Auf diesem Foto wurde kein QR-Code erkannt.';
   } catch {
-    if (session===scanSession) scanStatus.textContent = 'Das Foto konnte nicht gelesen werden. Wähle ein anderes QR-Foto.';
+    if (active()) scanStatus.textContent = 'Das Foto konnte nicht gelesen werden. Wähle ein anderes QR-Foto.';
   } finally {
     URL.revokeObjectURL(url);
-    if (session===scanSession) scanPhoto.value = '';
+    if (active()) scanPhoto.value = '';
   }
 };
 document.querySelector('#menu-scan').onclick = event => {
   event.preventDefault();
   history.pushState(null,'','#filament-scannen');
-  filter();
+  renderRoute();
   scanOpen.focus();
 };
 scanClose.onclick = () => { closeScanner(); scanOpen.focus(); };
@@ -3113,6 +3236,7 @@ function renderDryingDashboard() {
     settings.append(editor);
     return settings;
   }
+  const intervalEditors = new Set();
   const entries = items.map(item=>{
     const {card,roll,index,title,state,last,due} = item;
     const view = element('article','');
@@ -3129,12 +3253,12 @@ function renderDryingDashboard() {
     if (due!==null) view.append(element('p','Geplanter Termin: '+dateLabel(new Date(due).toISOString().slice(0,10))));
     if (roll.dryingDue) view.append(element('p','Manuell als fällig markiert.'));
     if (roll.packaging==='sealed') view.append(element('p','Originalverpackt'));
-    const recommendations = [...card.querySelectorAll('.drying-quick > ul > li')];
-    if (recommendations.length===1) view.append(element('p','Empfehlung: '+recommendations[0].textContent));
+    const recommendations = dryingRecommendations(card);
+    if (recommendations.length===1) view.append(element('p','Empfehlung: '+recommendations[0]));
     else if (recommendations.length>1) {
       const details = element('details','');
       const list = element('ul','');
-      for (const recommendation of recommendations) list.append(element('li',recommendation.textContent));
+      for (const recommendation of recommendations) list.append(element('li',recommendation));
       details.append(element('summary','Trocknungsempfehlungen'),list);
       view.append(details);
     } else view.append(element('p','Keine Trocknungsempfehlung hinterlegt.'));
@@ -3151,7 +3275,12 @@ function renderDryingDashboard() {
     };
     actions.append(mark);
     const options = element('details','');
-    options.append(element('summary','Weitere Trocknungsoptionen'),intervalEditor(item),actions,rollActionLink(card.id,roll.id,'trocknung','Rolle bearbeiten'));
+    options.append(element('summary','Weitere Trocknungsoptionen'));
+    if (!intervalEditors.has(card.id)) {
+      options.append(intervalEditor(item));
+      intervalEditors.add(card.id);
+    }
+    options.append(actions,rollActionLink(card.id,roll.id,'trocknung','Rolle bearbeiten'));
     view.append(history,options);
     return view;
   });
@@ -3175,5 +3304,5 @@ const dryingSealed = document.querySelector('#drying-show-sealed');
 const dryingRolls = document.querySelector('#drying-dashboard-rolls');
 const dryingStatus = document.querySelector('#drying-dashboard-status');
 if (dryingSealed) dryingSealed.onchange = () => renderDryingDashboard();
-search.oninput = filter;
+search.oninput = filterInventory;
 render();

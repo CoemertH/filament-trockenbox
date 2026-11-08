@@ -11,6 +11,10 @@ function weightKind(roll, nominal) {
   return roll.packaging === 'sealed' && nominal ? 'nominal' : 'unknown';
 }
 
+function calculatedRest(gross,tare) {
+  return Math.round((Number(gross)-Number(tare))*1000)/1000;
+}
+
 function gramsLabel(value) {
   return Number(value).toLocaleString('de-DE',{maximumFractionDigits:3})+' g';
 }

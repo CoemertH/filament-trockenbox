@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const {createHash} = require('node:crypto');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
@@ -31,10 +32,11 @@ const scope = vm.createContext({
 scope.localStorage.setItem = (key,value)=>stored.set(key,value);
 new vm.Script(app);
 vm.runInContext(read('filament-stock.js'),scope);
+vm.runInContext(section('function writeStorage','const firstDone'),scope);
 vm.runInContext(section('const dryingStates','function renderDryingDashboard'),scope);
-vm.runInContext(section('const settingsKey','function initialStockMode'),scope);
+vm.runInContext(section('const settingsKey','function legacyMigrationPending'),scope);
 vm.runInContext(section('const backupPrefixes','document.querySelector(\'#backup-export\')'),scope);
-vm.runInContext(section('function saveSelectedColor','function clearEditor'),scope);
+vm.runInContext(section('function selectDraftColor','function clearEditor'),scope);
 vm.runInContext(section('const materialTypes','function makeSwatch'),scope);
 vm.runInContext(section('function normalizeSearch','let previousRoute'),scope);
 
@@ -46,9 +48,10 @@ test('Materialarten und Farbfamilien älterer Karten',()=>{
   assert.equal(scope.colorFamily('Klein-Blau'),'Blau');
   assert.equal(scope.colorFamily('Perlmutt','Weiß'),'Weiß');
 });
-test('Farbauswahl ändert nur die Farbmetadaten der gespeicherten Karte',()=>{
-  scope.saveSelectedColor('Gelb');
-  assert.deepEqual(JSON.parse(stored.get(scope.key)),[{id:'old',material:'TPU',farbe:'Gelb',gewicht:'750 g',farbton:'',farbfamilie:''}]);
+test('Farbauswahl bleibt bis zum Speichern im Entwurf',()=>{
+  scope.selectDraftColor('Gelb');
+  assert.equal(scope.colorInput.value,'Gelb');
+  assert.equal(stored.has(scope.key),false);
   stored.clear();
 });
 test('Gewichte bleiben je Kategorie getrennt',()=>{
@@ -61,13 +64,16 @@ test('Sicherung akzeptiert Altbestand und neue Lagerreihenfolge und Trocknung',(
   const old={id:'erste-rolle',packaging:'opened',weight:'350',locationId:'regal'};
   const drying={date:'2026-11-07',device:'Trockenbox',temperature:55,hours:8};
   const records={
+    [scope.key]:JSON.stringify([{id:'11111111-1111-4111-8111-111111111111',material:'Test PETG',farbe:'Rot'}]),
     [scope.locationKey]:JSON.stringify([{id:'regal',name:'Regal'},{id:'schrank',name:'Schrank'}]),
     [scope.locationOrderKey]:'["schrank","regal"]',
     [scope.dryingIntervalKey]:'{"support-pla-petg-schwarz":14}',
     [stockKey]:JSON.stringify([{...old,drying:[drying]}])
   };
   assert.equal(scope.validateBackup({version:1,records}),records);
-  assert.equal(scope.backupPlan(records).length,5);
+  const plan = scope.backupPlan(records,{});
+  assert.equal(plan.issues.length,0);
+  assert.equal(plan.writes.length,5);
   assert.doesNotThrow(()=>scope.validateBackup({version:1,records:{[stockKey]:JSON.stringify([old])}}));
   assert.throws(()=>scope.validateBackup({version:1,records:{[scope.locationOrderKey]:'["regal","regal"]'}}));
   assert.equal(scope.validDryingSession({...drying,date:'2026-02-30'}),false);
@@ -79,7 +85,7 @@ test('Umlagerung lässt dieselbe Rollen-ID und den Trocknungsverlauf bestehen',(
     readLocations:()=>[{id:'regal',name:'Regal'}],
     selected:new Map([['one',{id:'card',rollId:'one',locationId:'schrank'}]]),
     stockForCard:()=>[{id:'one',locationId:'schrank',weight:'350',drying:[{device:'Trockenbox'}]}],
-    localStorage:scope.localStorage,cards:{children:[]},openLocationGroups:new Set(),renderLocationOverview(){},status:{}
+    saveRecords:records=>{ for (const [name,value] of records) stored.set(name,JSON.stringify(value)); return true; },cards:{children:[]},openLocationGroups:new Set(),renderLocationOverview(){},status:{}
   });
   vm.runInContext(route,vmScope);
   vmScope.transfer.onsubmit({preventDefault(){}});
@@ -87,7 +93,9 @@ test('Umlagerung lässt dieselbe Rollen-ID und den Trocknungsverlauf bestehen',(
   stored.clear();
 });
 test('Alle eingebetteten QR-Ziele besitzen weiterhin eine Karte',()=>{
-  const codes = JSON.parse(app.match(/const qrCodes = (\{[^\n]+\});/)[1]);
+  const payload = app.match(/^const qrCodes = (\{[^\n]+\});$/m);
+  assert.equal(createHash('sha256').update(payload[0]+'\n').digest('hex'),'29f8cba7095fed656515459b9131573c68f31cbaff67556e3aa72c77e2bf5a39');
+  const codes = JSON.parse(payload[1]);
   assert.equal(Object.keys(codes).length,12);
   for (const id of Object.keys(codes)) {
     assert.ok(html.includes('<article id="'+id+'"'));
@@ -104,4 +112,33 @@ test('Trocknungsampel unterscheidet alle Fristen und manuelle Markierungen',()=>
   assert.equal(scope.dryingSchedule(roll,null,today).state,'open');
   assert.equal(scope.dryingSchedule({dryingDue:true},null,today).state,'due');
   assert.equal(scope.dryingSchedule({},7,today).state,'open');
+});
+
+test('Sicherungen führen verschiedene Rollen zusammen und normalisieren Restgewicht',()=>{
+  const id='11111111-1111-4111-8111-111111111111';
+  const stock='filament-bestand:eigene-rolle-'+id;
+  const roll={id:'a',packaging:'opened',weight:'480'};
+  const incoming={id:'b',packaging:'opened',weight:'400',gross:'710',tare:'210'};
+  const current={[scope.key]:JSON.stringify([{id,material:'PETG',farbe:'Rot'}]),[stock]:JSON.stringify([roll])};
+  const plan=scope.backupPlan({[stock]:JSON.stringify([incoming])},current,'replace');
+  assert.equal(plan.conflicts.length,0);
+  assert.deepEqual(JSON.parse(Object.fromEntries(plan.writes)[stock]),[roll,{...incoming,weight:'500'}]);
+  assert.equal(scope.backupPlan({[stock]:JSON.stringify([incoming])},{},'restore').issues.length,1);
+});
+
+test('Mehrere Speicheränderungen werden nach einem Schreibfehler zurückgenommen',()=>{
+  stored.set('test-a','vorher');
+  const original = scope.localStorage.setItem;
+  scope.localStorage.setItem = (name,value)=>{
+    if (name==='test-b') throw Error('Speicher voll');
+    original(name,value);
+  };
+  try {
+    assert.equal(scope.writeStorage([['test-a','nachher'],['test-b','neu']]),false);
+    assert.equal(stored.get('test-a'),'vorher');
+    assert.equal(stored.has('test-b'),false);
+  } finally {
+    scope.localStorage.setItem = original;
+    stored.clear();
+  }
 });

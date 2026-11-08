@@ -487,10 +487,19 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
 </div>
 <p id="backup-status" role="status"></p>
 <div id="backup-preview" class="work-panel" hidden>
-<ul id="backup-stock-conflicts" hidden aria-label="Rollenlisten, die bei Übernahme ersetzt werden"></ul>
+<ul id="backup-stock-conflicts" hidden aria-label="Konflikte und fehlende Zuordnungen"></ul>
+<label>Importart<select id="backup-mode"><option value="merge">Mit vorhandenem Bestand zusammenführen</option><option value="restore">Gesamten Bestand aus der Sicherung wiederherstellen</option></select></label>
+<label hidden><input type="checkbox" id="backup-confirm"> Ich bestätige, dass die Sicherung meine vorhandenen Daten ersetzt.</label>
 <label>Bei Konflikten<select id="backup-conflict"><option value="keep">Vorhandene Daten behalten</option><option value="replace">Werte aus der Sicherung übernehmen</option></select></label>
 <button id="backup-import" type="button">Sicherung übernehmen</button>
-</div></section>
+</div>
+<form id="legacy-migration" class="work-panel" hidden>
+  <h2>Altbestand prüfen</h2>
+  <p>Ältere Versionen haben teilweise eine Rolle je Karte angezeigt, ohne sie einzeln zu speichern. Markiere nur Karten, für die du tatsächlich eine Rolle übernehmen möchtest. Für jede markierte Karte wird eine Rolle mit unbekanntem Gewicht erfasst.</p>
+  <fieldset></fieldset>
+  <button type="submit">Auswahl übernehmen und Prüfung abschließen</button>
+</form>
+</section>
 </main>
 <template id="specs-sunlu-pla-plus">
     <div><dt>Durchmesser</dt><dd>1,75 mm</dd></div>
@@ -512,6 +521,6 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
     <div><dt>Trocknungsdauer</dt><dd>Mindestens 8 Stunden</dd></div>
     <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
 </template>
-<script src="./filament-stock.js"></script>
-<script src="./filament-app.js?v=21"></script>
+<script src="./filament-stock.js?v=2"></script>
+<script src="./filament-app.js?v=22"></script>
 </html>
