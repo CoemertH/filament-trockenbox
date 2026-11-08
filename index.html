@@ -130,6 +130,12 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
 .roll-consumed{font-size:.86rem;margin-top:.25rem}
 .location-stock-roll .role-action-link{margin:0}
 .selecting-stock .location-stock-roll .role-action-link{display:none}
+.project-fields{display:grid;grid-template-columns:minmax(0,1fr);gap:.75rem}
+.project-fields fieldset,#project-panel fieldset{min-width:0;margin:.5rem 0}
+#project-panel label{display:block;margin:.4rem 0}
+#project-panel .project-green{color:#9de9b5}
+#project-panel .project-yellow{color:#ffdc83}
+#project-panel .project-red{color:#ffb0a9}
 </style>
 <main>
 <nav id="page-navigation" aria-label="Seitennavigation" hidden>
@@ -170,7 +176,12 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
     <strong id="label-drying">Trocknung</strong>
     <span id="detail-drying" class="dashboard-detail">Termine und Verlauf ansehen</span>
   </a>
+  <a class="dashboard-card" href="#projekt">
+    <strong>Projekt</strong>
+    <span class="dashboard-detail">Material planen und Verbrauch buchen</span>
+  </a>
 </nav>
+<section id="project-panel" class="work-panel" hidden></section>
 <section id="first-run" class="work-panel first-run" aria-labelledby="first-run-title" hidden>
   <p id="first-run-progress" class="action-note" aria-live="polite">Schritt 1 von 3</p>
   <h2 id="first-run-title" tabindex="-1">Lege dein erstes Filament an</h2>
@@ -522,5 +533,6 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
     <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
 </template>
 <script src="./filament-stock.js?v=2"></script>
-<script src="./filament-app.js?v=22"></script>
+<script src="./filament-projects.js?v=1"></script>
+<script src="./filament-app.js?v=23"></script>
 </html>

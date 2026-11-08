@@ -27,11 +27,12 @@ const scope = vm.createContext({
   rolls:[{id:'old',material:'TPU',farbe:'Blau',gewicht:'750 g'}],
   editing:'old',colorInput:{},shadeInput:{},form:{elements:{farbfamilie:{}}},
   status:{},findDuplicateCard:()=>null,render(){},updateColorPalette(){},updateCardSave(){},
-  document:{getElementById:()=>null}
+  document:{getElementById:()=>null,querySelector:()=>null}
 });
 scope.localStorage.setItem = (key,value)=>stored.set(key,value);
 new vm.Script(app);
 vm.runInContext(read('filament-stock.js'),scope);
+vm.runInContext(read('filament-projects.js'),scope);
 vm.runInContext(section('function writeStorage','const firstDone'),scope);
 vm.runInContext(section('const dryingStates','function renderDryingDashboard'),scope);
 vm.runInContext(section('const settingsKey','function legacyMigrationPending'),scope);
@@ -141,4 +142,46 @@ test('Mehrere Speicheränderungen werden nach einem Schreibfehler zurückgenomme
     scope.localStorage.setItem = original;
     stored.clear();
   }
+});
+
+test('Projekt zählt eine Rolle nur einmal und trennt Mengenampel von Schätzwerten',()=>{
+  const line = {cardId:'petg',need:210,reserve:0,single:false,dry:'check'};
+  const [group] = scope.projectGroups([line,line]);
+  const rolls = [{kind:'recorded',grams:300},{kind:'recorded',grams:180}];
+  assert.equal(group.need,420);
+  assert.equal(scope.projectAvailability(group,rolls).tone,'yellow');
+  assert.equal(scope.projectAvailability({...group,single:true},rolls).tone,'red');
+  assert.equal(scope.projectAvailability(group,[{kind:'nominal',grams:500}]).tone,'yellow');
+  assert.equal(scope.projectAvailability(group,[{kind:'recorded',grams:500}]).tone,'green');
+});
+
+test('Abschluss bucht einmal, Sicherungen spielen keinen Verbrauch erneut ein, neue Wägung hat Vorrang',()=>{
+  const projectId = '11111111-1111-4111-8111-111111111111';
+  const cardId = 'eigene-rolle-'+projectId;
+  const stockKey = 'filament-bestand:'+cardId;
+  const date = '2026-11-08T15:02:00.000Z';
+  const open = {id:projectId,name:'Testdruck',excluded:[],lines:[{cardId,label:'PETG',need:120,reserve:0,single:false,dry:'check'}]};
+  const raw = {id:'roll1',weight:'500',gross:'700',tare:'200',packaging:'opened'};
+  scope.stockForCard = id => JSON.parse(stored.get('filament-bestand:'+id) ?? '[]');
+  const booking = {cardId,rollId:raw.id,label:'PETG · Rolle 1',revision:'',entries:[{date,grams:120}]};
+  stored.clear();
+  try {
+    stored.set(stockKey,JSON.stringify([raw]));
+    const history = scope.closeProject([open],open,[booking],date);
+    stored.set('filament-projekte',JSON.stringify(history));
+    assert.equal(scope.currentProjectRoll(cardId,raw).weight,'380');
+    assert.throws(()=>scope.closeProject(history,open,[booking],date),/bereits abgeschlossen/);
+    const records = {
+      [scope.key]:JSON.stringify([{id:projectId,material:'Test PETG',farbe:'Schwarz'}]),
+      [stockKey]:JSON.stringify([raw]),
+      'filament-projekte':JSON.stringify(history)
+    };
+    assert.doesNotThrow(()=>scope.validateBackup({version:1,records}));
+    assert.equal(scope.backupPlan(records,records).writes.length,0);
+    assert.equal(scope.currentProjectRoll(cardId,{...raw,weight:'360',weightRevision:'new'}).weight,'360');
+    booking.entries.push({date,grams:100});
+    stored.set('filament-projekte',JSON.stringify(history));
+    assert.equal(scope.currentProjectRoll(cardId,raw).weight,'400');
+    assert.equal(scope.currentProjectRoll(cardId,{...raw,weight:'360',weightRevision:'new'}).weight,'360');
+  } finally { stored.clear(); }
 });

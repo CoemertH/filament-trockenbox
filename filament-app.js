@@ -61,6 +61,8 @@ const pageNavigation = document.querySelector('#page-navigation');
 const pageTitle = document.querySelector('header h1');
 const homeIntro = document.querySelector('header p');
 const pageTitles = {
+  projekt: "Projekt",
+  "projekt/historie": "Projekthistorie",
   'einstellungen':'Einstellungen',
   'filament-bestand':'Filamentbestand',
   'bestand-lagerort':'Bestand nach Lagerort',
@@ -400,7 +402,8 @@ function addStockSection(card, profile) {
   }
   function stockForm(roll, index, returnRoute = '', mode = '') {
     const editor = element('form','');
-    if (roll) editor.append(element('strong','Rolle ' + (index + 1)),element('p',weightDescription(roll,nominalWeight(card))));
+    const currentRoll = roll ? currentProjectRoll(card.id,roll) : null;
+    if (roll) editor.append(element('strong','Rolle ' + (index + 1)),element('p',weightDescription(currentRoll,nominalWeight(card))));
     const fields = element('div','');
     fields.className = 'fields';
     const conditionLabel = element('label','Verpackungsstatus');
@@ -415,11 +418,11 @@ function addStockSection(card, profile) {
     weight.min = '0';
     weight.step = 'any';
     weight.inputMode = 'decimal';
-    weight.value = roll?.weight ?? '';
+    weight.value = mode==='weigh' ? '' : currentRoll?.weight ?? '';
     weightLabel.append(weight);
     const grossLabel = element('label','Gesamtgewicht mit Spule (g)');
     const gross = weight.cloneNode();
-    gross.value = roll?.gross ?? '';
+    gross.value = mode==='weigh' || currentRoll!==roll ? '' : roll?.gross ?? '';
     grossLabel.append(gross);
     const emptyLabel = element('label','Leergewicht dieser Spule (g)');
     const empty = weight.cloneNode();
@@ -471,6 +474,7 @@ function addStockSection(card, profile) {
     const error = element('p','');
     error.setAttribute('role','status');
     editor.append(fields);
+    let weightChanged = () => true;
     if (roll) {
       const row = element('div','');
       row.className = 'stock-weight-save';
@@ -486,6 +490,9 @@ function addStockSection(card, profile) {
       }
       const inputs = mode==='move' ? [place] : [condition,weightMode,gross,empty,weight,place];
       const original = inputs.map(input=>input.value);
+      const weightFields = [weightMode,gross,empty,weight];
+      const initialWeight = weightFields.map(input=>input.value);
+      weightChanged = () => weightFields.some((input,index)=>input.value!==initialWeight[index]);
       const updateSaveButton = () => {
         save.hidden = !inputs.some((input,index)=>input.value!==original[index]);
         save.disabled = save.hidden;
@@ -508,6 +515,14 @@ function addStockSection(card, profile) {
       const updated = mode==='move' ? {...previous,locationId:place.value} :
         {...previous,id:roll?.id ?? crypto.randomUUID(),packaging:condition.value,weight:weight.value,gross:weightMode.value==='calculated' ? gross.value : '',tare:weightMode.value==='calculated' ? empty.value : (previous?.tare ?? '')};
       if (roll && !stock.some(item=>item.id===roll.id)) { error.textContent = 'Diese Rolle ist nicht mehr im Bestand.'; return; }
+      if (roll && mode!=='move') {
+        if (weightChanged()) updated.weightRevision = crypto.randomUUID();
+        else Object.assign(updated,{weight:previous.weight,gross:previous.gross,tare:previous.tare});
+      }
+      if (mode==='weigh' && (!weightChanged() || updated.weight==='')) {
+        error.textContent = 'Gib das neu gewogene Gewicht ein.';
+        return;
+      }
       if (place) updated.locationId = place.value;
       const priorNotice = rollNoticeState;
       if (roll && mode!=='move') rollNoticeState = {route:window.location.hash.slice(1),message:'Gespeichert. Änderungen für Rolle '+(index+1)+' übernommen.'};
@@ -515,8 +530,8 @@ function addStockSection(card, profile) {
       if (!saved) {
         rollNoticeState = priorNotice;
         error.textContent = 'Die Änderungen konnten nicht gespeichert werden.';
-      } else if (returnRoute && mode==='move') {
-        returnAfterRollSave(returnRoute,'Lagerort für Rolle '+(index+1)+' gespeichert.');
+      } else if (returnRoute && ['move','weigh'].includes(mode)) {
+        returnAfterRollSave(returnRoute,(mode==='weigh' ? 'Gewicht' : 'Lagerort')+' für Rolle '+(index+1)+' gespeichert.');
       }
     };
     editor.append(error);
@@ -555,7 +570,7 @@ function addStockSection(card, profile) {
     card.dataset.stockCount = String(stock.length);
     card.dataset.recordedStock = String(hasRecordedStock(card.id));
     card.querySelector('.inventory-count').textContent = stock.length===1 ? '1 Rolle im Bestand' : stock.length+' Rollen im Bestand';
-    card.querySelector('.detail-stock-summary').textContent = [count,...weightTotals(stock,nominalWeight(card))].join(' · ');
+    card.querySelector('.detail-stock-summary').textContent = [count,...weightTotals(stock.map(roll=>currentProjectRoll(card.id,roll)),nominalWeight(card))].join(' · ');
     summary.textContent = 'Rollen im Bestand';
     const add = element('button','Rolle hinzufügen');
     add.type = 'button';
@@ -589,7 +604,7 @@ function addStockSection(card, profile) {
       row.className = 'stock-roll-entry';
       const open = rollActionLink(card.id,roll.id,'bestand/'+card.id,'Rolle '+(index+1)+' bearbeiten');
       const place = places.get(roll.locationId) ?? 'Ohne Lagerort';
-      row.append(open,element('p',place+' · '+weightDescription(roll,nominal)),removeRollButton(roll,index));
+      row.append(open,element('p',place+' · '+weightDescription(currentProjectRoll(card.id,roll),nominal)),removeRollButton(roll,index));
       return row;
     });
     shortcuts.replaceChildren();
@@ -624,7 +639,7 @@ function addStockSection(card, profile) {
   section.append(summary,element('p','Der Bestand wird in diesem Browser gespeichert. Gib das Restgewicht direkt ein oder wiege die komplette Rolle und trage das Leergewicht ein.'),tareForm,feedback,undo,entries);
   const location = addLocationSection(card,readStock,saveStock);
   rollEditors.set(card,(roll,index,returnRoute,mode)=>{
-    if (mode==='move') return [stockForm(roll,index,returnRoute,mode)];
+    if (['move','weigh'].includes(mode)) return [stockForm(roll,index,returnRoute,mode)];
     const history = dryingHistory(roll,session=>{
       const saved = saveDrying(roll.id,session);
       if (saved) returnAfterRollSave(returnRoute,'Trocknung für Rolle '+(index+1)+' gespeichert.');
@@ -658,6 +673,7 @@ function addStockSection(card, profile) {
     location.refreshAssignments();
   }
   card.addEventListener('stock-batch-added',()=>refreshStock(readStock()));
+  card.addEventListener('project-stock-updated',()=>renderStock(readStock()));
   profile.before(shortcuts);
   profile.after(quickDrying,location.details,section);
   renderStock(readStock());
@@ -1209,7 +1225,7 @@ function renderLocationOverview(message = '', managerOpen = false) {
     const nominal = nominalWeight(card);
     for (const [index,roll] of stockForCard(card.id).entries()) {
       const group = groups.get(roll.locationId) ?? unassigned;
-      group.items.push({id:card.id,title,nominal,weight:roll.weight,packaging:roll.packaging,rollId:roll.id,index,locationId:roll.locationId ?? ''});
+      group.items.push({id:card.id,title,nominal,weight:currentProjectRoll(card.id,roll).weight,packaging:roll.packaging,rollId:roll.id,index,locationId:roll.locationId ?? ''});
     }
   }
   const selected = new Map();
@@ -1708,6 +1724,7 @@ function renderRoute() {
   const route = location.hash.slice(1);
   const routeChanged = route!==previousRoute;
   const roleView = route.startsWith('rolle/');
+  const projectView = route==='projekt' || route==='projekt/historie' || projectRoute.test(route);
   const contexts = [
     ['lagerbestand/','bestand-lagerort'],
     ['bestand/','filament-bestand'],
@@ -1730,10 +1747,10 @@ function renderRoute() {
   cards.classList.toggle('stock-detail',stockDetail);
   const role = roleView ? resolveRollRoute(route) : null;
   const settingsSubpage = ['meine-drucker','datensicherung'].includes(route);
-  const returnPage = settingsSubpage ? 'einstellungen' : roleView ? (role?.returnRoute ?? 'filament-bestand') : resultView ? 'filament-scannen' : single ? (context?.[1]==='scan-ergebnis' ? 'scan-ergebnis/'+id : context?.[1]) : null;
+  const returnPage = projectView && route!=='projekt' ? (projectRoute.test(route) && readProjects().some(item=>item.closed && 'projekt/'+item.id===route) ? 'projekt/historie' : 'projekt') : settingsSubpage ? 'einstellungen' : roleView ? (role?.returnRoute ?? 'filament-bestand') : resultView ? 'filament-scannen' : single ? (context?.[1]==='scan-ergebnis' ? 'scan-ergebnis/'+id : context?.[1]) : null;
   if (returnPage) {
     back.href = '#'+returnPage;
-    back.textContent = '← '+(pageTitles[returnPage] ?? (returnPage.startsWith('scan-ergebnis/')?'Scanergebnis':'Filamentkarte'));
+    back.textContent = '← '+(pageTitles[returnPage] ?? (projectRoute.test(returnPage) ? 'Projekt' : returnPage.startsWith('scan-ergebnis/')?'Scanergebnis':'Filamentkarte'));
   } else if (route==='filament-anlegen' && editing && editReturnRoute) {
     back.href = '#'+editReturnRoute;
     back.textContent = '← Filamentkarte';
@@ -1787,7 +1804,7 @@ function renderRoute() {
   const backupView = route==='datensicherung';
   const dryingView = Boolean(dryingDashboard && route==='trocknung');
   const settingsView = route==='einstellungen';
-  const home = !settingsView && !roleView && !single && !locationsView && !inventoryView && !createView && !scanningView && !printersView && !backupView && !dryingView && !missingLocalCard && !resultView && !demoList;
+  const home = !projectView && !settingsView && !roleView && !single && !locationsView && !inventoryView && !createView && !scanningView && !printersView && !backupView && !dryingView && !missingLocalCard && !resultView && !demoList;
   printerView.hidden = !printersView;
   if (printersView && routeChanged) renderPrinters();
   const onboarding = document.querySelector('#first-run');
@@ -1814,6 +1831,8 @@ function renderRoute() {
       else link.removeAttribute('aria-current');
     }
   }
+  projectPanel.hidden = !projectView;
+  if (projectView) renderProjects(route);
   rolePanel.hidden = !roleView;
   if (roleView) renderRolePanel(role);
   const demoAdd = document.querySelector('#demo-add');
@@ -1828,7 +1847,7 @@ function renderRoute() {
   }
   const heading = single ? target.querySelector('h2') : null;
   const title = heading ? [heading.textContent,target.dataset.color ?? target.querySelector('.label')?.textContent].filter(Boolean).join(' · ')
-    : roleView ? (role?.mode==='move'?'Rolle umlagern':role?.mode==='dry'?'Trocknung erfassen':'Rolle bearbeiten') : resultView ? 'Filament im Überblick' : missingLocalCard ? 'Filamentkarte' : createView && editing ? 'Filament bearbeiten' : pageTitles[route] ?? 'Filamentbibliothek';
+    : roleView ? (role?.mode==='move'?'Rolle umlagern':role?.mode==='dry'?'Trocknung erfassen':'Rolle bearbeiten') : resultView ? 'Filament im Überblick' : missingLocalCard ? 'Filamentkarte' : createView && editing ? 'Filament bearbeiten' : pageTitles[route] ?? (projectView ? 'Projekt' : 'Filamentbibliothek');
   if (pageNavigation) pageNavigation.hidden = home;
   pageTitle.hidden = Boolean(heading);
   pageTitle.closest('header').hidden = Boolean(heading);
@@ -2058,7 +2077,7 @@ function resolveRollRoute(route) {
     const index = stock.findIndex(roll=>roll.id===rollId);
     if (index<0) return null;
     const allowed = ['bestand-lagerort','trocknung','bestand/'+cardId,'scan-ergebnis/'+cardId];
-    return {card,roll:stock[index],index,mode:['move','dry'].includes(mode)?mode:'',returnRoute:allowed.includes(source)?source:'bestand/'+cardId};
+    return {card,roll:stock[index],index,mode:['move','dry','weigh'].includes(mode)?mode:'',returnRoute:(allowed.includes(source) || projectRoute.test(source))?source:'bestand/'+cardId};
   } catch { return null; }
 }
 function renderRolePanel(item) {
@@ -2161,7 +2180,7 @@ function renderScanResult(card,id) {
   if (shared) {
     scanResult.append(element('p','Geteilte Momentaufnahme. Persönlicher Bestand und eigene Druckwerte sind hier nicht enthalten.'));
   } else {
-    const stock = stockForCard(card.id);
+    const stock = stockForCard(card.id).map(roll=>currentProjectRoll(card.id,roll));
     const places = new Map(readLocations().map(place=>[place.id,place.name]));
     const interval = readDryingIntervals()[card.id];
     scanResult.append(element('h2','Bestand und Trocknung'));
@@ -2701,7 +2720,7 @@ let incomingBackup = null;
 const backupPrefixes = ['filament-x2d:','filament-bestand:','filament-spulengewicht:'];
 const localCardPattern = /^eigene-rolle-[a-f0-9-]{36}$/i;
 function personalKey(name) {
-  if (name === settingsKey || name === key || name === locationKey || name === locationOrderKey || name === dryingIntervalKey || name === printerKey || name === nozzleVariantKey) return true;
+  if (name === projectsKey || name === settingsKey || name === key || name === locationKey || name === locationOrderKey || name === dryingIntervalKey || name === printerKey || name === nozzleVariantKey) return true;
   const printerProfile = name.match(/^filament-druckprofil:(?:x2d|[a-f0-9-]{36}):(?:[0-7]|[a-f0-9-]{36}):(.+)$/i);
   if (printerProfile) return personalKey('filament-x2d:'+printerProfile[1]);
   const prefix = backupPrefixes.find(value=>name.startsWith(value));
@@ -2717,7 +2736,9 @@ function validateBackup(data) {
     if (!personalKey(name) || !isText(raw)) throw Error();
     if (name.startsWith('filament-spulengewicht:')) { if (!decimal(raw)) throw Error(); continue; }
     const value = JSON.parse(raw);
-    if (name===settingsKey) {
+    if (name===projectsKey) {
+      if (!validProjects(value)) throw Error();
+    } else if (name===settingsKey) {
       if (!validSettings(value)) throw Error();
     } else if (name===dryingIntervalKey) {
       if (!value || typeof value!=='object' || Array.isArray(value) || Object.values(value).some(days=>!validDryingInterval(days))) throw Error();
@@ -2733,7 +2754,7 @@ function validateBackup(data) {
       if (!Array.isArray(value) || value.some(item=>!item || !localCardPattern.test('eigene-rolle-'+item.id) || !isText(item.material) || !item.material.trim() || !isText(item.farbe) || !item.farbe.trim() || Object.values(item).some(field=>!isText(field)))) throw Error();
       if (new Set(value.map(item=>item.id)).size!==value.length) throw Error();
     } else if (name.startsWith('filament-bestand:')) {
-      if (!Array.isArray(value) || value.some(item=>!item || !isText(item.id) || !['unknown','opened','sealed'].includes(item.packaging) || !decimal(item.weight) || (item.locationId!==undefined && !isText(item.locationId)) || !decimal(item.gross??'') || !decimal(item.tare??'') || (item.dryingDue!==undefined && typeof item.dryingDue!=='boolean') || (item.drying!==undefined && (!Array.isArray(item.drying) || item.drying.some(session=>!validDryingSession(session)))) || (item.gross && (!item.tare && item.tare!=='0' || Number(item.gross)<Number(item.tare))))) throw Error();
+      if (!Array.isArray(value) || value.some(item=>!item || !isText(item.id) || !['unknown','opened','sealed'].includes(item.packaging) || !decimal(item.weight) || (item.weightRevision!==undefined && !isText(item.weightRevision)) || (item.locationId!==undefined && !isText(item.locationId)) || !decimal(item.gross??'') || !decimal(item.tare??'') || (item.dryingDue!==undefined && typeof item.dryingDue!=='boolean') || (item.drying!==undefined && (!Array.isArray(item.drying) || item.drying.some(session=>!validDryingSession(session)))) || (item.gross && (!item.tare && item.tare!=='0' || Number(item.gross)<Number(item.tare))))) throw Error();
       if (new Set(value.map(item=>item.id)).size!==value.length) throw Error();
     } else if (!value || typeof value!=='object' || Array.isArray(value) || Object.values(value).some(field=>!isText(field))) throw Error();
   }
@@ -2753,7 +2774,7 @@ function backupPlan(records,current = personalRecords(),mode = 'keep') {
       final[name] = raw;
       continue;
     }
-    const collection = [key,locationKey,printerKey,nozzleVariantKey].includes(name) ||
+    const collection = [key,locationKey,printerKey,nozzleVariantKey,projectsKey].includes(name) ||
       name.startsWith('filament-bestand:');
     if (collection && mode!=='restore') {
       const merged = new Map(JSON.parse(before??'[]').map(item=>[item.id,item]));
@@ -2782,6 +2803,7 @@ function validateBackupReferences(records,imported) {
   const locations = ids(locationKey);
   const ownCards = ids(key,'eigene-rolle-');
   const issues = [];
+  const booked = projectBalances(JSON.parse(records[projectsKey]??'[]'));
   for (const [name,raw] of Object.entries(records)) {
     if (!name.startsWith('filament-bestand:')) continue;
     const cardId = name.slice('filament-bestand:'.length);
@@ -2803,6 +2825,10 @@ function validateBackupReferences(records,imported) {
           roll.weight = weight;
           normalized = true;
         }
+      }
+      const consumed = booked.get(JSON.stringify([cardId,roll.id,roll.weightRevision ?? ''])) ?? 0;
+      if (consumed>0 && (weightKind(roll,'')!=='recorded' || consumed>Number(roll.weight))) {
+        issues.push(title+' · Rolle '+(index+1)+': Projektbuchungen überschreiten das erfasste Gewicht.');
       }
     }
     if (normalized) records[name] = JSON.stringify(stock);
@@ -2868,6 +2894,10 @@ function showBackupPlan() {
   const list = document.querySelector('#backup-stock-conflicts');
   const messages = [...plan.issues];
   for (const {name,id} of plan.conflicts) {
+    if (name===projectsKey && id) {
+      const project = readProjects().find(item=>item.id===id);
+      messages.push('Konflikt bei Projekt „'+(project?.name ?? id)+'“.');
+    }
     if (!id || !name.startsWith('filament-bestand:')) continue;
     const cardId = name.slice('filament-bestand:'.length);
     const card = document.getElementById(cardId);
@@ -2878,7 +2908,7 @@ function showBackupPlan() {
   list.hidden = !messages.length;
   list.replaceChildren(...messages.map(message=>element('li',message)));
   const removals = plan.writes.filter(([,value])=>value===null).length;
-  backupStatus.textContent = plan.issues.length ? 'Die Sicherung kann so nicht übernommen werden. Prüfe die fehlenden Zuordnungen.' :
+  backupStatus.textContent = plan.issues.length ? 'Die Sicherung kann so nicht übernommen werden. Prüfe die Hinweise in der Vorschau.' :
     restoring ? 'Vollständige Wiederherstellung · '+removals+' gespeicherte Datensätze entfallen. Einträge in der Datei ersetzen die vorhandenen Daten.' :
       'Vorschau · '+plan.added+' neue Einträge · '+plan.conflicts.length+' Konflikte.';
   backupApply.disabled = !plan.writes.length || Boolean(plan.issues.length) || (restoring && !backupConfirm.checked);
@@ -2908,13 +2938,18 @@ backupFile.onchange = async () => {
     backupStatus.textContent = 'Die Datei ist keine gültige Sicherung für die Filamentbibliothek.';
   }
 };
-backupApply.onclick = () => {
+backupApply.onclick = async () => {
   if (!incomingBackup) return;
   try {
-    const {writes} = showBackupPlan();
-    if (backupApply.disabled) return;
-    if (backupMode.value==='restore') writes.push([stockModeKey,'new']);
-    if (!writeStorage(writes)) throw Error();
+    const apply = () => {
+      if (!incomingBackup) return false;
+      const {writes} = showBackupPlan();
+      if (backupApply.disabled) return false;
+      if (backupMode.value==='restore') writes.push([stockModeKey,'new']);
+      if (!writeStorage(writes)) throw Error();
+      return true;
+    };
+    if (!(navigator.locks ? await navigator.locks.request(projectsKey,apply) : apply())) return;
     backupPreview.hidden = true;
     incomingBackup = null;
     backupStatus.textContent = 'Sicherung übernommen. Die Seite wird neu geladen.';
