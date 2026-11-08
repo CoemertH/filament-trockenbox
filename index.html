@@ -21,6 +21,7 @@ article:target > .open-roll{display:none}
 .filament-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-bottom:.8rem}.filament-actions button{margin:0;padding:.6rem .45rem}.filament-actions button:disabled{background:transparent;color:var(--muted);border:1px solid #58716e;cursor:default}
 #filament-scanner{padding:.85rem;margin-bottom:1rem;border:1px solid #58716e;border-radius:.7rem}#scan-video{display:block;width:100%;max-height:18rem;object-fit:contain;background:#10161c;margin-bottom:.6rem}
 #main-menu a{background:#18242c}#main-menu a:hover,#main-menu a:focus-visible{background:#24443d}#scan-view>button{margin-bottom:.7rem}
+.custom-profile-editor{margin-top:.65rem}.custom-profile-row label{overflow-wrap:anywhere}
 </style>
 <main>
 <header><h1>Filamentlager</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -850,8 +851,72 @@ function prepareCard(card, color) {
   fields.lastElementChild.append(save,message);
   let baseline = saved;
   const inputs = [...fields.querySelectorAll('input')];
+  const customPrefix = 'eigen:';
+  function appendCustomField(name,value) {
+    const row = element('div','');
+    row.className = 'profile-save-row stock-weight-save custom-profile-row';
+    const label = element('label',name);
+    const input = element('input','');
+    input.name = customPrefix+name;
+    input.maxLength = 200;
+    input.value = value;
+    label.append(input);
+    row.append(label);
+    fields.append(row);
+    return input;
+  }
+  function renderCustomFields(values) {
+    const standardRow = inputs.at(-1).closest('.profile-save-row');
+    standardRow.append(save,message);
+    for (const row of fields.querySelectorAll('.custom-profile-row')) row.remove();
+    for (const [name,value] of Object.entries(values)) {
+      if (name.startsWith(customPrefix) && name.length>customPrefix.length) appendCustomField(name.slice(customPrefix.length),value);
+    }
+  }
+  const add = element('button','Eigenen Wert hinzufügen');
+  add.type = 'button';
+  add.setAttribute('aria-expanded','false');
+  const customEditor = element('div','');
+  customEditor.className = 'custom-profile-editor';
+  customEditor.hidden = true;
+  const nameLabel = element('label','Name des eigenen Werts');
+  const nameInput = element('input','');
+  nameInput.placeholder = 'z. B. Bauteillüfter (%)';
+  nameInput.maxLength = 60;
+  nameLabel.append(nameInput);
+  const create = element('button','Feld hinzufügen');
+  create.type = 'button';
+  const customStatus = element('p','');
+  customStatus.setAttribute('role','status');
+  customEditor.append(nameLabel,create,customStatus);
+  editor.append(add,customEditor);
+  add.onclick = () => {
+    customEditor.hidden = !customEditor.hidden;
+    add.setAttribute('aria-expanded',String(!customEditor.hidden));
+    if (!customEditor.hidden) nameInput.focus();
+  };
+  create.onclick = () => {
+    const name = nameInput.value.trim().replace(/\s+/g,' ');
+    if (!name) { customStatus.textContent = 'Gib einen Namen für das Feld ein.'; return; }
+    const normalized = name.normalize('NFKC').toLocaleLowerCase('de');
+    if ([...fields.querySelectorAll('label')].some(label=>label.textContent.normalize('NFKC').toLocaleLowerCase('de')===normalized)) {
+      customStatus.textContent = 'Ein Feld mit diesem Namen gibt es bereits.';
+      return;
+    }
+    const input = appendCustomField(name,'');
+    nameInput.value = '';
+    customStatus.textContent = '';
+    customEditor.hidden = true;
+    add.setAttribute('aria-expanded','false');
+    onProfileEdit({target:input});
+    input.focus();
+  };
+  nameInput.onkeydown = event => {
+    if (event.key==='Enter') { event.preventDefault(); create.click(); }
+  };
+  renderCustomFields(saved);
   function updateSaveButton() {
-    const changed = inputs.some(input=>input.value!==(baseline[input.name] ?? ''));
+    const changed = [...fields.querySelectorAll('input')].some(input=>input.value!==(baseline[input.name] ?? '') || (input.name.startsWith(customPrefix) && !Object.hasOwn(baseline,input.name)));
     save.hidden = save.disabled = !changed;
   }
   function onProfileEdit(event) {
@@ -874,6 +939,11 @@ function prepareCard(card, color) {
     baseline = readProfile();
     const values = drafts.get(profileStorageKey()) ?? baseline;
     for (const input of inputs) input.value = values[input.name] ?? '';
+    renderCustomFields(values);
+    nameInput.value = '';
+    customStatus.textContent = '';
+    customEditor.hidden = true;
+    add.setAttribute('aria-expanded','false');
     onProfileEdit();
   }
   printerSelect.onchange = () => switchProfile(readPrinters().find(printer=>printer.id===printerSelect.value) ?? x2d,'0');
