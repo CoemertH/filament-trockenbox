@@ -5,6 +5,24 @@ const reset = document.querySelector('#reset');
 const status = document.querySelector('#status');
 const key = 'filament-trockenbox-rolls';
 const stockModeKey = 'filament-bestandsmodus';
+const settingsKey = 'filament-einstellungen';
+const settingsDefaults = {
+  compact:true,inventory:'filament-bestand',packaging:'unknown',locationId:'',printerId:'x2d',nozzleId:'0'
+};
+function validSettings(value) {
+  return Boolean(value && typeof value.compact==='boolean' &&
+    ['filament-bestand','bestand-lagerort'].includes(value.inventory) &&
+    ['unknown','sealed','opened'].includes(value.packaging) &&
+    typeof value.locationId==='string' &&
+    typeof value.printerId==='string' && typeof value.nozzleId==='string');
+}
+function readSettings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(settingsKey));
+    if (validSettings(saved)) return saved;
+  } catch {}
+  return settingsDefaults;
+}
 function initialStockMode(storage) {
   try {
     const saved = storage.getItem(stockModeKey);
@@ -41,6 +59,7 @@ const pageNavigation = document.querySelector('#page-navigation');
 const pageTitle = document.querySelector('header h1');
 const homeIntro = document.querySelector('header p');
 const pageTitles = {
+  'einstellungen':'Einstellungen',
   'filament-bestand':'Filamentbestand',
   'bestand-lagerort':'Bestand nach Lagerort',
   'filament-anlegen':'Filament erfassen',
@@ -388,7 +407,8 @@ function addStockSection(card, profile) {
     const conditionLabel = element('label','Verpackungsstatus');
     const condition = element('select','');
     for (const [value,label] of Object.entries(packaging)) condition.add(new Option(label,value));
-    condition.value = roll?.packaging ?? 'sealed';
+    const defaults = readSettings();
+    condition.value = roll?.packaging ?? defaults.packaging;
     conditionLabel.append(condition);
     const weightLabel = element('label','Restgewicht in Gramm (optional)');
     const weight = element('input','');
@@ -435,15 +455,16 @@ function addStockSection(card, profile) {
     updateWeight();
     fields.append(conditionLabel,weightModeLabel,grossLabel,emptyLabel,weightLabel,result);
     let place;
-    if (returnRoute) {
+    if (returnRoute || !roll) {
       place = element('select','');
       const label = element('label','Lagerort');
       place.add(new Option('Nicht angegeben',''));
       for (const item of readLocations()) place.add(new Option(item.name,item.id));
-      if (roll.locationId && ![...place.options].some(option=>option.value===roll.locationId)) {
+      if (roll?.locationId && ![...place.options].some(option=>option.value===roll.locationId)) {
         place.add(new Option('Gespeicherter Lagerort nicht verfügbar',roll.locationId));
       }
-      place.value = roll.locationId ?? '';
+      const preferredLocation = roll?.locationId ?? defaults.locationId;
+      place.value = [...place.options].some(option=>option.value===preferredLocation) ? preferredLocation : '';
       label.append(place);
       fields.append(label);
     }
@@ -641,6 +662,15 @@ function printerNozzles(printer) {
     ...variants.filter(item=>item.position===index)
   ]);
 }
+function preferredProfile(settings = readSettings(), printers = readPrinters()) {
+  const printer = printers.find(item=>item.id===settings.printerId) ?? printers[0];
+  const nozzles = printerNozzles(printer);
+  const nozzle = nozzles.find(item=>item.id===settings.nozzleId) ?? nozzles[0];
+  return {printer,nozzle};
+}
+function nozzleOptions(printer) {
+  return printerNozzles(printer).map(item=>new Option(nozzleName(printer,item.position)+(item.diameter?' · '+item.diameter+' mm':''),item.id));
+}
 const materialTypes = ['PLA','PLA+','PETG','ABS','ASA','TPU','TPE','PA','PC','PVA','HIPS','PP','PCTG','PET','Stützmaterial'];
 const colorFamilies = ['Schwarz','Weiß','Grau','Beige','Braun','Rot','Orange','Gelb','Grün','Türkis','Blau','Lila','Rosa','Silber','Gold','Transparent','Mehrfarbig','Sonstige'];
 function materialType(title, explicit = '') {
@@ -720,8 +750,9 @@ function prepareCard(card, color, metadata = {}) {
   choice.append(printerLabel,nozzleLabel);
   editor.append(choice);
   const drafts = new Map();
-  let activePrinter = x2d;
-  let activeNozzle = '0';
+  const preferred = preferredProfile();
+  let activePrinter = preferred.printer;
+  let activeNozzle = preferred.nozzle.id;
   function refreshPrinterOptions() {
     printerSelect.replaceChildren(...readPrinters().map(printer=>new Option(printer.name,printer.id)));
     printerSelect.value = activePrinter.id;
@@ -901,6 +932,12 @@ function prepareCard(card, color, metadata = {}) {
     add.setAttribute('aria-expanded','false');
     onProfileEdit();
   }
+  card.addEventListener('apply-preferred-profile',() => {
+    const {printer,nozzle} = preferredProfile();
+    refreshPrinterOptions();
+    if (printer.id!==activePrinter.id || nozzle.id!==activeNozzle) switchProfile(printer,nozzle.id);
+    printerSelect.value = printer.id;
+  });
   printerSelect.onchange = () => switchProfile(readPrinters().find(printer=>printer.id===printerSelect.value) ?? x2d,'0');
   nozzle.onchange = () => switchProfile(activePrinter,nozzle.value);
   editor.onsubmit = event => {
@@ -1540,6 +1577,47 @@ function normalizeSearch(value) {
 }
 let previousRoute = null;
 let editReturnRoute = '';
+const settingsPage = document.querySelector('#einstellungen');
+const settingsLink = document.querySelector('#menu-settings');
+const stockMenuLink = document.querySelector('#menu-filaments');
+const settingsForm = document.querySelector('#settings-form');
+const settingsFields = settingsForm.elements;
+const settingsSave = settingsForm.querySelector('button');
+const settingsStatus = document.querySelector('#settings-status');
+function renderSettings() {
+  const settings = readSettings();
+  const printers = readPrinters();
+  const {printer,nozzle} = preferredProfile(settings,printers);
+  settingsFields.compact.checked = settings.compact;
+  settingsFields.inventory.value = settings.inventory;
+  settingsFields.packaging.value = settings.packaging;
+  settingsFields.locationId.replaceChildren(new Option('Nicht angegeben',''),...readLocations().map(place=>new Option(place.name,place.id)));
+  settingsFields.locationId.value = readLocations().some(place=>place.id===settings.locationId) ? settings.locationId : '';
+  settingsFields.printerId.replaceChildren(...printers.map(item=>new Option(item.name,item.id)));
+  settingsFields.printerId.value = printer.id;
+  settingsFields.nozzleId.replaceChildren(...nozzleOptions(printer));
+  settingsFields.nozzleId.value = nozzle.id;
+  settingsSave.hidden = true;
+  settingsStatus.textContent = '';
+}
+settingsForm.onchange = event => {
+  if (event.target===settingsFields.printerId) {
+    const printer = readPrinters().find(item=>item.id===event.target.value) ?? x2d;
+    settingsFields.nozzleId.replaceChildren(...nozzleOptions(printer));
+  }
+  settingsSave.hidden = false;
+  settingsStatus.textContent = '';
+};
+settingsForm.onsubmit = event => {
+  event.preventDefault();
+  const settings = {...Object.fromEntries(new FormData(settingsForm)),compact:settingsFields.compact.checked};
+  try {
+    if (!validSettings(settings)) throw Error();
+    localStorage.setItem(settingsKey,JSON.stringify(settings));
+    settingsSave.hidden = true;
+    settingsStatus.textContent = 'Einstellungen gespeichert.';
+  } catch { settingsStatus.textContent = 'Die Einstellungen konnten nicht gespeichert werden.'; }
+};
 const scrollPositions = new Map();
 const listRoutes = new Set(['filament-bestand','bestand-lagerort','trocknung']);
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
@@ -1578,6 +1656,7 @@ function updateDashboardStatus() {
 }
 function filter() {
   const route = location.hash.slice(1);
+  const routeChanged = route!==previousRoute;
   const roleView = route.startsWith('rolle/');
   const contexts = [
     ['lagerbestand/','bestand-lagerort'],
@@ -1600,7 +1679,8 @@ function filter() {
   const stockDetail = single && context?.[1]==='bestand-lagerort';
   cards.classList.toggle('stock-detail',stockDetail);
   const role = roleView ? resolveRollRoute(route) : null;
-  const returnPage = roleView ? (role?.returnRoute ?? 'filament-bestand') : resultView ? 'filament-scannen' : single ? (context?.[1]==='scan-ergebnis' ? 'scan-ergebnis/'+id : context?.[1]) : null;
+  const settingsSubpage = ['meine-drucker','datensicherung'].includes(route);
+  const returnPage = settingsSubpage ? 'einstellungen' : roleView ? (role?.returnRoute ?? 'filament-bestand') : resultView ? 'filament-scannen' : single ? (context?.[1]==='scan-ergebnis' ? 'scan-ergebnis/'+id : context?.[1]) : null;
   if (returnPage) {
     back.href = '#'+returnPage;
     back.textContent = '← '+(pageTitles[returnPage] ?? (returnPage.startsWith('scan-ergebnis/')?'Scanergebnis':'Filamentkarte'));
@@ -1608,7 +1688,30 @@ function filter() {
     back.href = '#'+editReturnRoute;
     back.textContent = '← Filamentkarte';
   }
-  if (stockDetail && route!==previousRoute) target.querySelector('.locations').open = true;
+  if (single && routeChanged && !demoDetail) {
+    const returningFromRole = previousRoute?.startsWith('rolle/') && resolveRollRoute(previousRoute)?.card===target;
+    const returningFromEdit = previousRoute==='filament-anlegen' && editReturnRoute===route;
+    if (!returningFromRole && !returningFromEdit) {
+      for (const section of target.querySelectorAll(':scope > details[open]')) section.open = false;
+      target.dispatchEvent(new Event('apply-preferred-profile'));
+      const profile = target.querySelector('.card-heading + details');
+      if (profile && !readSettings().compact && !stockDetail && !route.startsWith('etikett/')) profile.open = true;
+    }
+    if (stockDetail) {
+      const locations = target.querySelector('.locations');
+      if (locations) locations.open = true;
+    }
+  }
+  const freshStock = routeChanged && (previousRoute===null || previousRoute==='');
+  if (freshStock && route==='bestand-lagerort') {
+    openLocationGroups.clear();
+    scrollPositions.delete(route);
+  }
+  if (freshStock && route==='filament-bestand') {
+    search.value = materialFilter.value = colorFilter.value = '';
+    availableOnly.checked = false;
+    scrollPositions.delete(route);
+  }
   if (rollNotice) {
     rollNotice.hidden = !rollNoticeState || rollNoticeState.route!==route;
     rollNotice.textContent = rollNotice.hidden ? '' : rollNoticeState.message;
@@ -1633,7 +1736,8 @@ function filter() {
   const printersView = route==='meine-drucker';
   const backupView = route==='datensicherung';
   const dryingView = Boolean(dryingDashboard && route==='trocknung');
-  const home = !roleView && !single && !locationsView && !inventoryView && !createView && !scanningView && !printersView && !backupView && !dryingView && !missingLocalCard && !resultView && !demoList;
+  const settingsView = route==='einstellungen';
+  const home = !settingsView && !roleView && !single && !locationsView && !inventoryView && !createView && !scanningView && !printersView && !backupView && !dryingView && !missingLocalCard && !resultView && !demoList;
   printerView.hidden = !printersView;
   if (printersView) renderPrinters();
   const onboarding = document.querySelector('#first-run');
@@ -1641,7 +1745,11 @@ function filter() {
   const total = home ? updateDashboardStatus() : 0;
   const firstRun = Boolean(onboarding && home && stockMode==='new' && !total && !rolls.length &&
     ![...cards.querySelectorAll('article[id]')].some(card=>hasRecordedStock(card.id)));
-  menu.hidden = !home || firstRun;
+  menu.hidden = !home;
+  settingsLink.hidden = !home;
+  settingsPage.hidden = !settingsView;
+  if (settingsView && routeChanged) renderSettings();
+  if (home) stockMenuLink.href = '#'+readSettings().inventory;
   if (onboarding) onboarding.hidden = !firstRun;
   if (demoNotice) demoNotice.hidden = !demoList && !demoDetail;
   overview.hidden = !inventoryView;
@@ -1670,7 +1778,7 @@ function filter() {
     : roleView ? (role?.mode==='move'?'Rolle umlagern':role?.mode==='dry'?'Trocknung erfassen':'Rolle bearbeiten') : resultView ? 'Filament im Überblick' : missingLocalCard ? 'Filamentkarte' : createView && editing ? 'Filament bearbeiten' : pageTitles[route] ?? 'Hauptmenü';
   if (pageNavigation) pageNavigation.hidden = home;
   pageTitle.hidden = Boolean(heading);
-  pageTitle.parentElement.hidden = Boolean(heading);
+  pageTitle.closest('header').hidden = Boolean(heading);
   if (!heading) pageTitle.textContent = title;
   homeIntro.hidden = !home || firstRun;
   document.title = title+' · Filamentlager';
@@ -1908,6 +2016,7 @@ function scanSavedProfiles(card) {
   const printer = element('select','');
   const nozzle = element('select','');
   const printers = readPrinters();
+  const preferred = preferredProfile(readSettings(),printers);
   for (const item of printers) printer.add(new Option(item.name,item.id));
   const fields = element('div','');
   fields.className = 'fields';
@@ -1942,7 +2051,10 @@ function scanSavedProfiles(card) {
   };
   nozzle.onchange = renderValues;
   section.append(element('h2','Eigene Druckwerte'),fields,values);
+  printer.value = preferred.printer.id;
   printer.onchange();
+  nozzle.value = preferred.nozzle.id;
+  renderValues();
   return section;
 }
 function renderScanResult(card,id) {
@@ -2020,13 +2132,6 @@ function renderScanResult(card,id) {
 }
 
 document.querySelector('#new-filament').onclick = () => { clearEditor(); showCapture('menu'); status.textContent = ''; };
-const firstCapture = document.querySelector('#first-capture');
-if (firstCapture) firstCapture.onclick = () => {
-  clearEditor();
-  showCapture('new');
-  colorPicker.open = true;
-  status.textContent = '';
-};
 function updateCardSave() {
   const savedCard = rolls.find(roll=>roll.id===editing);
   const changed = !savedCard || [...form.querySelectorAll('[name]')].some(input=>input.value!==(savedCard[input.name] ?? ''));
@@ -2065,8 +2170,15 @@ function createBatchFields() {
     locationSelect.replaceChildren(new Option('Nicht angegeben',''),...readLocations().map(place=>new Option(place.name,place.id)));
     if ([...locationSelect.options].some(option=>option.value===selected)) locationSelect.value = selected;
   }
-  refreshLocations();
-  return {fields,quantity,locationSelect,packaging,refreshLocations};
+  function applyDefaults() {
+    const defaults = readSettings();
+    refreshLocations();
+    quantity.value = '1';
+    packaging.value = defaults.packaging;
+    locationSelect.value = [...locationSelect.options].some(option=>option.value===defaults.locationId) ? defaults.locationId : '';
+  }
+  applyDefaults();
+  return {fields,quantity,locationSelect,packaging,refreshLocations,applyDefaults};
 }
 function makeBatch(batch) {
   const count = batch.quantity.valueAsNumber;
@@ -2145,6 +2257,10 @@ function renderCaptureMatches() {
   updateBatchSubmit();
 }
 function showCapture(mode) {
+  if (!editing && captureMode==='menu' && mode!=='menu') {
+    existingBatch.applyDefaults();
+    createBatch.applyDefaults();
+  }
   captureMode = mode;
   captureActions.hidden = Boolean(editing) || mode==='done';
   existingButton.setAttribute('aria-pressed',String(mode==='existing'));
@@ -2327,7 +2443,7 @@ let incomingBackup = null;
 const backupPrefixes = ['filament-x2d:','filament-bestand:','filament-spulengewicht:'];
 const localCardPattern = /^eigene-rolle-[a-f0-9-]{36}$/i;
 function personalKey(name) {
-  if (name === key || name === locationKey || name === locationOrderKey || name === dryingIntervalKey || name === printerKey || name === nozzleVariantKey) return true;
+  if (name === settingsKey || name === key || name === locationKey || name === locationOrderKey || name === dryingIntervalKey || name === printerKey || name === nozzleVariantKey) return true;
   const printerProfile = name.match(/^filament-druckprofil:(?:x2d|[a-f0-9-]{36}):(?:[0-7]|[a-f0-9-]{36}):(.+)$/i);
   if (printerProfile) return personalKey('filament-x2d:'+printerProfile[1]);
   const prefix = backupPrefixes.find(value=>name.startsWith(value));
@@ -2343,7 +2459,9 @@ function validateBackup(data) {
     if (!personalKey(name) || !isText(raw)) throw Error();
     if (name.startsWith('filament-spulengewicht:')) { if (!decimal(raw)) throw Error(); continue; }
     const value = JSON.parse(raw);
-    if (name===dryingIntervalKey) {
+    if (name===settingsKey) {
+      if (!validSettings(value)) throw Error();
+    } else if (name===dryingIntervalKey) {
       if (!value || typeof value!=='object' || Array.isArray(value) || Object.values(value).some(days=>!validDryingInterval(days))) throw Error();
     } else if (name===locationOrderKey) {
       if (!Array.isArray(value) || value.some(id=>!isText(id) || !id) || new Set(value).size!==value.length) throw Error();

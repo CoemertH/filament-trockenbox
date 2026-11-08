@@ -30,6 +30,13 @@
 .capture-actions button[aria-pressed=true],.capture-results button[aria-pressed=true]{outline:2px solid var(--mint);outline-offset:2px}
 .capture-batch{min-width:0;margin:.8rem 0;border:1px solid #58716e;border-radius:.65rem;padding:.65rem}
 .capture-batch legend{padding:0 .35rem}
+.page-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem}
+.settings-link{display:inline-grid;place-items:center;flex:none;min-width:44px;min-height:44px;margin-top:.35rem;border:1px solid #58716e;border-radius:.65rem;background:#17282c;color:var(--mint)}
+.settings-link[hidden]{display:none}
+.settings-link:focus-visible{outline:2px solid var(--mint);outline-offset:3px}
+#einstellungen fieldset{min-width:0}
+#einstellungen legend{padding:0 .35rem;font-weight:700}
+#einstellungen .action-card{text-decoration:none}
 .capture-extra{margin-top:.8rem}
 .capture-extra summary{margin-bottom:.5rem}
 .scan-result-actions{display:flex;gap:.65rem;flex-wrap:wrap;align-items:center}
@@ -48,8 +55,6 @@
 #main-menu .dashboard-scan strong,#main-menu .dashboard-scan .dashboard-detail,#main-menu .dashboard-scan .dashboard-icon{color:#10261e}
 #main-menu .dashboard-capture{background:#1e3334;border-color:#73928b}
 #main-menu .dashboard-drying[data-due] .dashboard-detail{color:#ffb49f;font-weight:700}
-#main-menu .dashboard-backup{grid-column:1/-1;justify-self:end;display:inline-flex;gap:.35rem;align-items:center;min-height:44px;margin-top:.55rem;padding:.25rem .7rem;font-size:.83rem;color:#c0d0ce;background:transparent;border:1px solid #48615f;border-radius:.55rem}
-#main-menu .dashboard-backup .dashboard-icon{width:1rem;height:1rem;color:inherit}
 #main-menu a:focus-visible{outline:2px solid #fff;outline-offset:3px}
 
 main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
@@ -123,7 +128,18 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
   <a id="home-link" href="#"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg> Hauptmenü</a>
   <a id="all-rolls" href="#filament-bestand" hidden>← Filamentbestand</a>
 </nav>
-<header><h1 id="page-title">Hauptmenü</h1><p id="home-intro">Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
+<header>
+  <div class="page-heading">
+    <h1 id="page-title">Hauptmenü</h1>
+    <a id="menu-settings" class="settings-link" href="#einstellungen" aria-label="Einstellungen" hidden>
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m10 2-.6 2.6-2 .9L5 4.1 2.8 7.9l2 1.8-.2 2.3-2.6 1 1.1 4.2 2.8-.1 1.6 1.6-.1 2.8 4.2 1.1 1-2.6 2.3-.2 1.8 2 3.8-2.2-1.4-2.4.9-2 2.6-.6v-4.4L20 9.6l-.9-2 1.4-2.4-3.8-2.2-1.8 2-2.3-.2L11.6 2Z"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+    </a>
+  </div>
+  <p id="home-intro">Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p>
+</header>
 <p id="roll-notice" class="work-panel roll-notice" role="status" hidden></p>
 <nav id="main-menu" class="workshop-dashboard" aria-label="Hauptmenü">
   <a id="menu-scan" class="dashboard-card dashboard-scan" href="#filament-scannen" aria-labelledby="label-scan" aria-describedby="detail-scan">
@@ -138,34 +154,48 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
   </a>
   <a id="menu-filaments" class="dashboard-card dashboard-stock" href="#filament-bestand" aria-labelledby="label-stock" aria-describedby="detail-stock">
     <svg class="dashboard-icon" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 6a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
-    <strong id="label-stock">Bestand nach Filament</strong>
+    <strong id="label-stock">Bestand</strong>
     <span id="detail-stock" class="dashboard-detail">Rollen und Druckwerte ansehen</span>
-  </a>
-  <a id="menu-locations" class="dashboard-card dashboard-places" href="#bestand-lagerort" aria-labelledby="label-places" aria-describedby="detail-places">
-    <svg class="dashboard-icon" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v13H3zm-1-4h20v4H2zm8 9h4"/></svg>
-    <strong id="label-places">Bestand nach Lagerort</strong>
-    <span id="detail-places" class="dashboard-detail">Rollen finden und umlagern</span>
   </a>
   <a id="menu-drying" class="dashboard-card dashboard-drying" href="#trocknung" aria-labelledby="label-drying" aria-describedby="detail-drying">
     <svg class="dashboard-icon" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15h16M5 19h14M7 12c-2-2 2-3 0-6m5 6c-2-2 2-3 0-7m5 7c-2-2 2-3 0-6"/></svg>
     <strong id="label-drying">Trocknung</strong>
     <span id="detail-drying" class="dashboard-detail">Termine und Verlauf ansehen</span>
   </a>
-  <a id="menu-printers" class="dashboard-card dashboard-printers" href="#meine-drucker" aria-labelledby="label-printers" aria-describedby="detail-printers">
-    <svg class="dashboard-icon" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3h16v18H4zm0 13h16m-8-9v4m-3 0h6m-3 0v2"/></svg>
-    <strong id="label-printers">Meine Drucker</strong>
-    <span id="detail-printers" class="dashboard-detail">Drucker und Düsen verwalten</span>
-  </a>
-  <a class="dashboard-backup" href="#datensicherung"><svg class="dashboard-icon" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg> Datensicherung</a>
 </nav>
 <section id="first-run" class="work-panel first-run" aria-labelledby="first-run-title" hidden>
   <h2 id="first-run-title">Dein Filamentlager</h2>
   <p>Erfasse deine Rollen, damit du Lagerort, Restgewicht und Trocknung im Blick hast. Dein Bestand wird in diesem Browser gespeichert.</p>
   <div class="action-grid">
-    <a id="first-capture" class="action-card action-primary" href="#filament-anlegen" aria-labelledby="first-capture-title" aria-describedby="first-capture-help"><strong id="first-capture-title">Erste Rolle erfassen</strong><small id="first-capture-help">Name, Material, Farbe und Anzahl eingeben</small></a>
     <a class="action-card action-secondary" href="#beispiele" aria-labelledby="first-demo-title" aria-describedby="first-demo-help"><strong id="first-demo-title">Beispiel ansehen</strong><small id="first-demo-help">Filamentkarten kennenlernen</small></a>
   </div>
-  <div class="first-tools"><a class="first-import" href="#filament-scannen">QR-Code öffnen</a><a class="first-import" href="#datensicherung">Sicherung importieren</a></div>
+</section>
+<section id="einstellungen" aria-labelledby="page-title" hidden>
+  <p>Diese Einstellungen gelten in diesem Browser und werden mit der Datensicherung übertragen.</p>
+  <form id="settings-form">
+    <fieldset class="work-panel fields">
+      <legend>Anzeige</legend>
+      <label class="available-filter"><input name="compact" type="checkbox"> Filamentkarten kompakt öffnen</label>
+      <p class="action-note">Ohne Kompaktansicht öffnen sich die eigenen Druckwerte beim Aufrufen einer Filamentkarte.</p>
+      <label>Bestandsansicht beim Öffnen<select name="inventory"><option value="filament-bestand">Nach Filament</option><option value="bestand-lagerort">Nach Lagerort</option></select></label>
+    </fieldset>
+    <fieldset class="work-panel fields">
+      <legend>Erfassung</legend>
+      <label>Verpackungsstatus für neue Rollen<select name="packaging"><option value="unknown">Unbekannt</option><option value="sealed">Originalverpackt</option><option value="opened">Angebrochen</option></select></label>
+      <label>Lagerort für neue Rollen<select name="locationId"></select></label>
+    </fieldset>
+    <fieldset class="work-panel fields">
+      <legend>Druckprofile</legend>
+      <label>Bevorzugter Drucker<select name="printerId"></select></label>
+      <label>Bevorzugte Düse<select name="nozzleId"></select></label>
+    </fieldset>
+    <button type="submit" hidden>Einstellungen speichern</button>
+    <p id="settings-status" role="status"></p>
+  </form>
+  <nav class="action-grid" aria-label="Verwaltung">
+    <a class="action-card action-secondary" href="#meine-drucker"><strong>Meine Drucker</strong><small>Drucker und Düsen verwalten</small></a>
+    <a class="action-card action-secondary" href="#datensicherung"><strong>Datensicherung</strong><small>Sicherung exportieren oder importieren</small></a>
+  </nav>
 </section>
 <p id="demo-notice" class="work-panel" hidden>Das sind Beispielkarten. Sie zählen nicht zu deinem Bestand. <a id="demo-add" class="role-action-link" href="#filament-anlegen" hidden>Eigene Rolle zu diesem Filament hinzufügen</a></p>
 <section id="trocknung" aria-labelledby="page-title" hidden>
@@ -401,7 +431,7 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
 <p id="missing-local-card" hidden>Diese Filamentkarte ist in diesem Browser nicht gespeichert. Importiere deine Datensicherung, um das Etikett hier zu öffnen.</p>
 
 <section id="datensicherung" aria-labelledby="page-title" hidden>
-<p>Sichere eigene Karten, Druckprofile, Bestände, Lagerorte, deren Reihenfolge, Trocknungsverläufe und Trocknungsintervalle. Die Datei kannst du auch in einem anderen Browser importieren.</p>
+<p>Sichere eigene Karten, Druckprofile, Bestände, Lagerorte, deren Reihenfolge, Trocknungsdaten und Einstellungen. Die Datei kannst du auch in einem anderen Browser importieren.</p>
 <div class="action-grid">
   <button id="backup-export" class="action-card action-primary" type="button" aria-labelledby="backup-export-title" aria-describedby="backup-export-help"><strong id="backup-export-title">Sicherung exportieren</strong><small id="backup-export-help">Bestand als JSON-Datei speichern</small></button>
   <label class="action-card action-secondary file-action"><strong id="backup-select-title">Sicherung importieren</strong><small id="backup-select-help">Datei auswählen und Vorschau prüfen</small><input id="backup-file" type="file" accept=".json,application/json" aria-labelledby="backup-select-title" aria-describedby="backup-select-help"></label>
@@ -434,5 +464,5 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
     <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
 </template>
 <script src="./filament-stock.js"></script>
-<script src="./filament-app.js?v=17"></script>
+<script src="./filament-app.js?v=18"></script>
 </html>
