@@ -1775,13 +1775,13 @@ function filter() {
   }
   const heading = single ? target.querySelector('h2') : null;
   const title = heading ? [heading.textContent,target.dataset.color ?? target.querySelector('.label')?.textContent].filter(Boolean).join(' · ')
-    : roleView ? (role?.mode==='move'?'Rolle umlagern':role?.mode==='dry'?'Trocknung erfassen':'Rolle bearbeiten') : resultView ? 'Filament im Überblick' : missingLocalCard ? 'Filamentkarte' : createView && editing ? 'Filament bearbeiten' : pageTitles[route] ?? 'Hauptmenü';
+    : roleView ? (role?.mode==='move'?'Rolle umlagern':role?.mode==='dry'?'Trocknung erfassen':'Rolle bearbeiten') : resultView ? 'Filament im Überblick' : missingLocalCard ? 'Filamentkarte' : createView && editing ? 'Filament bearbeiten' : pageTitles[route] ?? 'Filamentbibliothek';
   if (pageNavigation) pageNavigation.hidden = home;
   pageTitle.hidden = Boolean(heading);
   pageTitle.closest('header').hidden = Boolean(heading);
   if (!heading) pageTitle.textContent = title;
   homeIntro.hidden = !home || firstRun;
-  document.title = title+' · Filamentlager';
+  document.title = home ? title : title+' · Filamentbibliothek';
   back.hidden = !(returnPage || (createView && editing && editReturnRoute));
   if (!pageNavigation && !home && back.hidden) {
     back.href = '#';
