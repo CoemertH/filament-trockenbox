@@ -21,6 +21,7 @@ let stockMode = 'new';
 try { stockMode = initialStockMode(localStorage); } catch {}
 const dryingIntervalKey = 'filament-trocknungsintervalle';
 const dryingActions = new WeakMap();
+const rollEditors = new WeakMap();
 const labels = {durchmesser:'Durchmesser',gewicht:'Gewicht',druck:'Drucktemperatur',trocknung:'Trocknung'};
 let rolls = [];
 let editing = null;
@@ -379,7 +380,7 @@ function addStockSection(card, profile) {
     feedback.textContent = 'Bestand gespeichert.';
     return true;
   }
-  function stockForm(roll, index, savedRollId) {
+  function stockForm(roll, index, savedRollId, returnRoute = '') {
     const editor = element('form','');
     if (roll) editor.append(element('strong','Rolle ' + (index + 1)),element('p',weightDescription(roll,nominalWeight(card))));
     const fields = element('div','');
@@ -419,7 +420,22 @@ function addStockSection(card, profile) {
     empty.oninput = updateWeight;
     updateWeight();
     fields.append(conditionLabel,grossLabel,emptyLabel,weightLabel);
+    let place;
+    if (returnRoute) {
+      place = element('select','');
+      const label = element('label','Lagerort');
+      place.add(new Option('Nicht angegeben',''));
+      for (const item of readLocations()) place.add(new Option(item.name,item.id));
+      if (roll.locationId && ![...place.options].some(option=>option.value===roll.locationId)) {
+        place.add(new Option('Gespeicherter Lagerort nicht verfügbar',roll.locationId));
+      }
+      place.value = roll.locationId ?? '';
+      label.append(place);
+      fields.append(label);
+    }
     const save = element('button',roll ? 'Änderung speichern' : 'Rolle speichern');
+    const error = element('p','');
+    error.setAttribute('role','status');
     editor.append(fields);
     if (roll) {
       const row = element('div','');
@@ -428,7 +444,7 @@ function addStockSection(card, profile) {
       const saved = element('span','Gespeichert');
       saved.setAttribute('role','status');
       row.append(weightLabel,save,saved);
-      const inputs = [condition,gross,empty,weight];
+      const inputs = place ? [condition,gross,empty,weight,place] : [condition,gross,empty,weight];
       const original = inputs.map(input=>input.value);
       const updateSaveButton = () => {
         saved.hidden = true;
@@ -450,9 +466,14 @@ function addStockSection(card, profile) {
       if (roll && save.hidden) return;
       const stock = readStock();
       const updated = {...stock.find(item=>item.id===roll?.id),id:roll?.id ?? crypto.randomUUID(),packaging:condition.value,weight:weight.value,gross:gross.value,tare:empty.value};
-      saveStock(roll ? stock.map(item=>item.id===roll.id ? updated : item) : [...stock,updated],roll?.id);
+      if (roll && !stock.some(item=>item.id===roll.id)) { error.textContent = 'Diese Rolle ist nicht mehr im Bestand.'; return; }
+      if (place) updated.locationId = place.value;
+      const saved = saveStock(roll ? stock.map(item=>item.id===roll.id ? updated : item) : [...stock,updated],roll?.id);
+      if (!saved) error.textContent = 'Die Änderungen konnten nicht gespeichert werden.';
+      else if (returnRoute) location.hash = returnRoute;
     };
-    if (roll) {
+    editor.append(error);
+    if (roll && !returnRoute) {
       const remove = element('button','Rolle aufgebraucht');
       remove.type = 'button';
       remove.style.marginInlineStart = '.5rem';
@@ -516,7 +537,10 @@ function addStockSection(card, profile) {
     const rows = stock.map((roll,index)=>{
       const row = element('div','');
       row.className = 'stock-roll-entry';
-      row.append(stockForm(roll,index,savedRollId),dryingHistory(roll,session=>saveDrying(roll.id,session)));
+      const open = rollActionLink(card.id,roll.id,'bestand/'+card.id,'Rolle '+(index+1)+' bearbeiten');
+      const legacy = element('details','');
+      legacy.append(element('summary','Weitere Rollenaktionen'),stockForm(roll,index,savedRollId));
+      row.append(open,element('p',weightDescription(roll,nominalWeight(card))),legacy);
       return row;
     });
     entries.replaceChildren(...rows,add,draft);
@@ -537,6 +561,15 @@ function addStockSection(card, profile) {
   };
   section.append(summary,element('p','Der Bestand wird in diesem Browser gespeichert. Gib das Restgewicht direkt ein oder wiege die komplette Rolle und trage das Leergewicht ein.'),tareForm,feedback,undo,entries);
   const location = addLocationSection(card,readStock,saveStock);
+  rollEditors.set(card,(roll,index,returnRoute)=>{
+    const history = dryingHistory(roll,session=>{
+      const saved = saveDrying(roll.id,session);
+      if (saved) location.hash = returnRoute;
+      return saved;
+    });
+    history.querySelector('summary').textContent = 'Trocknung erfassen';
+    return [stockForm(roll,index,undefined,returnRoute),history];
+  });
   dryingActions.set(card,{
     saveDrying,
     markDue(rollId,dryingDue) {
@@ -1302,7 +1335,7 @@ function renderLocationOverview(message = '', managerOpen = false) {
           move.type = 'button';
           move.setAttribute('aria-label',item.title+' · '+rollLabel+' umlagern');
           move.onclick = () => setTransferMode('single',row,roll);
-          row.append(element('span',rollLabel),move,checkbox(item.title+' · '+rollLabel,[roll]));
+          row.append(rollActionLink(roll.id,roll.rollId,'bestand-lagerort',rollLabel),move,checkbox(item.title+' · '+rollLabel,[roll]));
           line.append(row);
         }
         list.append(line);
@@ -1310,7 +1343,13 @@ function renderLocationOverview(message = '', managerOpen = false) {
       content.append(list);
     } else content.append(element('p','Keine Rollen an diesem Lagerort.'));
   }
-  if (!groups.size) locationGroups.append(element('p','Derzeit sind keine Rollen im Bestand.'));
+  if (!groups.size) {
+    const link = element('a','Filament erfassen');
+    link.href = '#filament-anlegen';
+    const message = element('p','Noch keine Rollen erfasst. ');
+    message.append(link);
+    locationGroups.append(message);
+  }
 }
 const sharedPrefix = 'filament/';
 const publicFields = ['material','farbe',...Object.keys(labels),'produktseite'];
@@ -1507,6 +1546,7 @@ function updateDashboardStatus() {
 }
 function filter() {
   const route = location.hash.slice(1);
+  const roleView = route.startsWith('rolle/');
   const contexts = [
     ['lagerbestand/','bestand-lagerort'],
     ['bestand/','filament-bestand'],
@@ -1525,10 +1565,11 @@ function filter() {
   const demoDetail = single && context?.[1]==='beispiele' && !target.hasAttribute('data-local');
   const stockDetail = single && context?.[1]==='bestand-lagerort';
   cards.classList.toggle('stock-detail',stockDetail);
-  const returnPage = resultView ? 'filament-scannen' : single ? context?.[1] : null;
+  const role = roleView ? resolveRollRoute(route) : null;
+  const returnPage = roleView ? (role?.returnRoute ?? 'filament-bestand') : resultView ? 'filament-scannen' : single ? context?.[1] : null;
   if (returnPage) {
     back.href = '#'+returnPage;
-    back.textContent = '← '+pageTitles[returnPage];
+    back.textContent = '← '+(pageTitles[returnPage] ?? (returnPage.startsWith('scan-ergebnis/')?'Scanergebnis':'Filamentkarte'));
   } else if (route==='filament-anlegen' && editing && editReturnRoute) {
     back.href = '#'+editReturnRoute;
     back.textContent = '← Filamentkarte';
@@ -1542,7 +1583,7 @@ function filter() {
   const printersView = route==='meine-drucker';
   const backupView = route==='datensicherung';
   const dryingView = Boolean(dryingDashboard && route==='trocknung');
-  const home = !single && !locationsView && !inventoryView && !createView && !scanningView && !printersView && !backupView && !dryingView && !missingLocalCard && !resultView && !demoList;
+  const home = !roleView && !single && !locationsView && !inventoryView && !createView && !scanningView && !printersView && !backupView && !dryingView && !missingLocalCard && !resultView && !demoList;
   printerView.hidden = !printersView;
   if (printersView) renderPrinters();
   const onboarding = document.querySelector('#first-run');
@@ -1554,9 +1595,29 @@ function filter() {
   if (onboarding) onboarding.hidden = !firstRun;
   if (demoNotice) demoNotice.hidden = !demoList && !demoDetail;
   overview.hidden = !inventoryView;
+  const tabs = document.querySelector('#inventory-tabs');
+  if (tabs) {
+    tabs.hidden = !inventoryView && !locationsView;
+    for (const link of tabs.querySelectorAll('a')) {
+      if (link.hash==='#'+route) link.setAttribute('aria-current','page');
+      else link.removeAttribute('aria-current');
+    }
+  }
+  rolePanel.hidden = !roleView;
+  if (roleView) renderRolePanel(role);
+  const demoAdd = document.querySelector('#demo-add');
+  if (demoAdd) {
+    demoAdd.hidden = !demoDetail;
+    if (demoDetail) demoAdd.onclick = () => {
+      clearEditor();
+      selectedCard = target.id;
+      query.value = target.querySelector('h2').textContent;
+      showCapture('existing');
+    };
+  }
   const heading = single ? target.querySelector('h2') : null;
   const title = heading ? [heading.textContent,target.dataset.color ?? target.querySelector('.label')?.textContent].filter(Boolean).join(' · ')
-    : resultView ? 'Filament im Überblick' : missingLocalCard ? 'Filamentkarte' : createView && editing ? 'Filament bearbeiten' : pageTitles[route] ?? 'Hauptmenü';
+    : roleView ? 'Rolle bearbeiten' : resultView ? 'Filament im Überblick' : missingLocalCard ? 'Filamentkarte' : createView && editing ? 'Filament bearbeiten' : pageTitles[route] ?? 'Hauptmenü';
   if (pageNavigation) pageNavigation.hidden = home;
   pageTitle.hidden = Boolean(heading);
   pageTitle.parentElement.hidden = Boolean(heading);
@@ -1606,7 +1667,22 @@ function filter() {
     const demoOnly = inventoryView && stockMode==='new' && !card.hasAttribute('data-local') && !hasRecordedStock(card.id);
     card.hidden = single ? card !== target : demoList ? card.hasAttribute('data-local') || !card.id : demoOnly || !matches || (availableOnly.checked && card.dataset.stockCount === '0') || (materialFilter.value && card.dataset.material !== materialFilter.value) || (colorFilter.value && card.dataset.colorFamily !== colorFilter.value);
   }
-  document.querySelector('#empty').hidden = !inventoryView || [...cards.children].some(card => !card.hidden);
+  const empty = document.querySelector('#empty');
+  const visible = [...cards.children].some(card=>!card.hidden);
+  empty.hidden = !inventoryView || visible;
+  if (inventoryView && !visible) {
+    const hasStock = [...cards.querySelectorAll('article[id]')].some(card=>stockForCard(card.id).length || hasRecordedStock(card.id) || card.hasAttribute('data-local'));
+    const action = element(hasStock?'button':'a',hasStock?'Filter zurücksetzen':'Erste Rolle erfassen');
+    if (hasStock) {
+      action.type = 'button';
+      action.className = 'action-secondary';
+      action.onclick = () => { search.value = materialFilter.value = colorFilter.value = ''; availableOnly.checked = false; filter(); };
+    } else {
+      action.href = '#filament-anlegen';
+      action.onclick = () => { clearEditor(); showCapture('new'); colorPicker.open = true; };
+    }
+    empty.replaceChildren(element('p',hasStock?'Keine Treffer für diese Filter.':'Noch keine Rollen erfasst.'),action);
+  }
 }
 materialFilter.onchange = colorFilter.onchange = availableOnly.onchange = filter;
 window.addEventListener('hashchange', () => {
@@ -1726,6 +1802,35 @@ updateColorPalette();
 const cardSave = document.querySelector('#card-save');
 const filamentEditor = form.closest('details');
 const scanView = document.querySelector('#scan-view');
+const rolePanel = element('section','');
+rolePanel.className = 'work-panel role-panel';
+rolePanel.hidden = true;
+scanView.after(rolePanel);
+function rollActionLink(cardId,rollId,returnRoute,label) {
+  const link = element('a',label);
+  link.className = 'role-action-link';
+  link.href = '#rolle/'+[cardId,rollId,returnRoute].map(encodeURIComponent).join('/');
+  return link;
+}
+function resolveRollRoute(route) {
+  try {
+    const [cardId,rollId,source] = route.slice('rolle/'.length).split('/').map(decodeURIComponent);
+    const card = document.getElementById(cardId);
+    if (!card || card.parentElement!==cards || !rollEditors.has(card)) return null;
+    const stock = stockForCard(cardId);
+    const index = stock.findIndex(roll=>roll.id===rollId);
+    if (index<0) return null;
+    const allowed = ['bestand-lagerort','trocknung','bestand/'+cardId,'scan-ergebnis/'+cardId];
+    return {card,roll:stock[index],index,returnRoute:allowed.includes(source)?source:'bestand/'+cardId};
+  } catch { return null; }
+}
+function renderRolePanel(item) {
+  if (!item) { rolePanel.replaceChildren(element('p','Diese Rolle ist nicht mehr im Bestand.')); return; }
+  const {card,roll,index,returnRoute} = item;
+  const label = card.querySelector('h2').textContent+' · '+card.dataset.color;
+  rolePanel.replaceChildren(element('h2',label),element('p','Rolle '+(index+1)),
+    ...rollEditors.get(card)(roll,index,returnRoute));
+}
 const scanResultPrefix = 'scan-ergebnis/';
 const scanResult = element('section','');
 scanResult.id = 'scan-ergebnis';
@@ -1838,6 +1943,7 @@ function renderScanResult(card,id) {
       ].join(' · ')),signal);
       if (last) entry.append(element('p','Zuletzt getrocknet: '+last.split('-').reverse().join('.')));
       if (due!==null) entry.append(element('p','Geplant für: '+new Date(due).toISOString().slice(0,10).split('-').reverse().join('.')));
+      entry.append(rollActionLink(card.id,roll.id,'scan-ergebnis/'+id,'Rolle bearbeiten'));
       group.append(entry);
     }
     scanResult.append(group,scanSavedProfiles(card));
@@ -2231,6 +2337,21 @@ backupFile.onchange = async () => {
     const plan = backupPlan(parsed);
     incomingBackup = parsed;
     const conflicts = plan.filter(item=>item.conflict).length;
+    const list = document.querySelector('#backup-stock-conflicts');
+    if (list) {
+      const entries = plan.filter(item=>item.conflict && item.name.startsWith('filament-bestand:'));
+      list.hidden = !entries.length;
+      list.replaceChildren(...entries.map(item=>{
+        const cardId = item.name.slice('filament-bestand:'.length);
+        const card = document.getElementById(cardId);
+        const title = card ? [card.querySelector('h2').textContent,card.dataset.color].filter(Boolean).join(' · ') : cardId;
+        const before = JSON.parse(item.before).length;
+        const after = JSON.parse(item.value).length;
+        const count = n => n===1 ? '1 Rolle' : n+' Rollen';
+        return element('li',title+' · Vorhanden: '+count(before)+' · Sicherung: '+count(after)+'. Bei Übernahme wird die gesamte Rollenliste ersetzt.');
+
+      }));
+    }
     backupStatus.textContent = plan.length ? 'Vorschau: '+(plan.length-conflicts)+' neue Einträge, '+conflicts+' Konflikte mit vorhandenen Einträgen.' : 'Die Sicherung enthält keine Änderungen.';
     backupConflict.value = 'keep';
     backupPreview.hidden = !plan.length;
@@ -2612,11 +2733,21 @@ function renderDryingDashboard() {
       report(saved ? (roll.dryingDue ? 'Manuelle Markierung entfernt.' : 'Rolle als fällig markiert.') : 'Die Markierung konnte nicht gespeichert werden.');
     };
     actions.append(mark);
-    view.append(history,intervalEditor(item),actions);
+    view.append(history,intervalEditor(item),actions,rollActionLink(card.id,roll.id,'trocknung','Rolle bearbeiten'));
     return view;
   });
   if (!dryingSealed.checked && sealed) entries.push(element('p',sealed+(sealed===1?' originalverpackte Rolle ausgeblendet.':' originalverpackte Rollen ausgeblendet.')));
-  if (!items.length) entries.unshift(element('p','Keine Rollen für diese Auswahl vorhanden.'));
+  if (!items.length) {
+    const message = element('p',sealed ? 'Originalverpackte Rollen sind ausgeblendet.' : 'Noch keine Rollen erfasst.');
+    if (!sealed) {
+      const link = element('a','Filament erfassen');
+      link.href = '#filament-anlegen';
+      message.append(' ',link);
+    }
+    entries.unshift(message);
+  } else if (!items.some(item=>item.state==='due')) {
+    entries.unshift(element('p',items.every(item=>item.state==='open') ? 'Für diese Rollen ist noch kein Termin geplant.' : 'Keine Rollen fällig.'));
+  }
   dryingRolls.replaceChildren(...entries);
 }
 
