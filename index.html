@@ -75,6 +75,11 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
 .inventory-view .card-heading .label{font-size:.73rem}
 .inventory-count{display:none;color:var(--work-muted);font-size:.83rem;margin:.2rem 0 0}
 .inventory-view .inventory-count{display:block}
+.detail-stock-summary{margin:.25rem 0 0;color:var(--work-muted);font-size:.85rem}
+.inventory-view .detail-stock-summary{display:none}
+.stock-weight-save output{color:var(--mint);align-self:center}
+.role-shortcuts button{margin:0}
+.stock-transfer .fields[hidden]{display:none}
 .inventory-view .open-roll{display:inline-flex;align-items:center;min-height:44px;margin-top:.15rem}
 .filament-section>summary{min-height:44px;padding:.6rem .65rem;border:1px solid var(--work-border);border-radius:.65rem;background:var(--work-surface);overflow-wrap:anywhere}
 .filament-section[open]>summary{border-color:#73928b}
@@ -107,7 +112,7 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
 #backup-stock-conflicts{padding-left:1.2rem}
 .role-shortcuts{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.5rem}
 .role-action-link.action-primary{background:var(--mint);color:#10261e;border-color:var(--mint);font-weight:700}
-.role-panel .fields label[hidden]{display:none!important}
+.role-panel .fields label[hidden],.stock .fields label[hidden]{display:none!important}
 .roll-notice{border-color:var(--mint)}
 .roll-consumed{font-size:.86rem;margin-top:.25rem}
 .location-stock-roll .role-action-link{margin:0}
@@ -133,7 +138,7 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
   </a>
   <a id="menu-filaments" class="dashboard-card dashboard-stock" href="#filament-bestand" aria-labelledby="label-stock" aria-describedby="detail-stock">
     <svg class="dashboard-icon" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 6a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
-    <strong id="label-stock">Filamentbestand</strong>
+    <strong id="label-stock">Bestand nach Filament</strong>
     <span id="detail-stock" class="dashboard-detail">Rollen und Druckwerte ansehen</span>
   </a>
   <a id="menu-locations" class="dashboard-card dashboard-places" href="#bestand-lagerort" aria-labelledby="label-places" aria-describedby="detail-places">
@@ -171,7 +176,7 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
   <div id="drying-dashboard-rolls"></div>
 </section>
 <nav id="inventory-tabs" class="work-panel inventory-tabs" aria-label="Bestandsansicht" hidden>
-  <strong>Mein Bestand</strong><a href="#filament-bestand">Nach Filament</a><a href="#bestand-lagerort">Nach Lagerort</a>
+  <strong>Bestand</strong><a href="#filament-bestand">Nach Filament</a><a href="#bestand-lagerort">Nach Lagerort</a>
 </nav>
 <section id="bestand-lagerort" aria-labelledby="page-title" hidden>
   
@@ -179,7 +184,7 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
   <div id="location-stock-groups"></div>
 </section>
 <details id="filament-editor" hidden><summary hidden>Filamentdaten</summary>
-<form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Filamentname<input name="material" required maxlength="100"></label><label>Materialart<input name="materialart" list="material-types" maxlength="40" placeholder="z. B. PLA, PETG oder TPU"></label><datalist id="material-types"></datalist><details class="color-picker"><summary>Farbe<span class="color-preview"><span class="color-preview-sample" aria-hidden="true"></span><span class="color-preview-name">Keine Farbe gewählt</span></span></summary><div class="color-palette" aria-label="Gängige Farben"></div><label>Farbname<input name="farbe" required maxlength="60" placeholder="Farbe auswählen oder eigenen Namen eingeben"></label><label>Farbmuster für Sonderfarben (optional)<input name="farbton" maxlength="7" pattern="#[0-9a-fA-F]{6}" placeholder="#AABBCC"></label><label>Farbmuster visuell wählen<input type="color" id="shade-picker" value="#808080"></label><label>Farbfamilie<select name="farbfamilie"><option value="">Automatisch zuordnen</option></select></label></details></div><details class="capture-extra"><summary>Weitere Angaben</summary><div class="fields"><label>Durchmesser<input name="durchmesser" placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" placeholder="500 g"></label><label>Drucktemperatur<input name="druck" placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" placeholder="70 °C · 8 Stunden"></label><label>Produktseite beim Hersteller (optional)<input name="produktseite" type="url" placeholder="https://…"></label></div></details><button id="card-save">Filamentkarte speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
+<form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert. Über die Datensicherung kannst du sie in einen anderen Browser übertragen.</p><div class="fields"><label>Filamentname<input name="material" required maxlength="100"></label><label>Materialart<input name="materialart" list="material-types" maxlength="40" placeholder="z. B. PLA, PETG oder TPU"></label><datalist id="material-types"></datalist><details class="color-picker"><summary>Farbe<span class="color-preview"><span class="color-preview-sample" aria-hidden="true"></span><span class="color-preview-name">Keine Farbe gewählt</span></span></summary><div class="color-palette" aria-label="Gängige Farben"></div><label>Farbname<input name="farbe" required maxlength="60" placeholder="Farbe auswählen oder eigenen Namen eingeben"></label><label>Farbmuster für Sonderfarben (optional)<input name="farbton" maxlength="7" pattern="#[0-9a-fA-F]{6}" placeholder="#AABBCC"></label><label>Farbmuster visuell wählen<input type="color" id="shade-picker" value="#808080"></label><label>Farbfamilie<select name="farbfamilie"><option value="">Automatisch zuordnen</option></select></label></details></div><details class="capture-extra"><summary>Weitere Angaben</summary><div class="fields"><label>Durchmesser<input name="durchmesser" placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" placeholder="500 g"></label><label>Drucktemperatur<input name="druck" placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" placeholder="70 °C · 8 Stunden"></label><label>Produktseite beim Hersteller (optional)<input name="produktseite" type="url" placeholder="https://…"></label></div></details><button id="card-save">Filamentkarte speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
 <section id="meine-drucker" aria-labelledby="page-title" hidden>
   
   <div id="printer-list"></div>
@@ -429,5 +434,5 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
     <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
 </template>
 <script src="./filament-stock.js"></script>
-<script src="./filament-app.js?v=15"></script>
+<script src="./filament-app.js?v=16"></script>
 </html>

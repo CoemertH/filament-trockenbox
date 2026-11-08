@@ -406,20 +406,34 @@ function addStockSection(card, profile) {
     const empty = weight.cloneNode();
     empty.value = roll?.tare || defaultTare;
     emptyLabel.append(empty);
-    const manualWeight = weight.value;
+    const weightModeLabel = element('label','Restgewicht erfassen');
+    const weightMode = element('select','');
+    weightMode.add(new Option('Aus Gesamtgewicht berechnen','calculated'));
+    weightMode.add(new Option('Restgewicht direkt eingeben','manual'));
+    weightMode.value = gross.value || !weight.value ? 'calculated' : 'manual';
+    weightModeLabel.append(weightMode);
+    const result = element('output','');
+    result.setAttribute('aria-live','polite');
+    const manualWeight = gross.value ? '' : weight.value;
     function updateWeight() {
-      const hasGross = gross.value !== '';
-      weight.readOnly = hasGross;
+      const calculating = weightMode.value==='calculated';
+      const hasGross = calculating && gross.value !== '';
       const invalid = hasGross && (empty.value === '' || Number(gross.value) < Number(empty.value));
+      grossLabel.hidden = !calculating;
+      emptyLabel.hidden = !calculating;
+      gross.disabled = empty.disabled = !calculating;
+      weightLabel.hidden = calculating;
+      weight.disabled = calculating;
+      result.hidden = !calculating;
       gross.setCustomValidity(invalid ? 'Gib ein Leergewicht ein, das höchstens so groß wie das Gesamtgewicht ist.' : '');
-      if (hasGross) weight.value = invalid ? '' : String(Math.round((Number(gross.value)-Number(empty.value))*1000)/1000);
+      weight.value = calculating ? (hasGross && !invalid ? String(Math.round((Number(gross.value)-Number(empty.value))*1000)/1000) : '') : manual;
+      result.textContent = weight.value && calculating ? 'Berechnetes Restgewicht: '+Number(weight.value).toLocaleString('de')+' g' : 'Berechnetes Restgewicht: –';
     }
     let manual = manualWeight;
-    weight.oninput = () => { if (!weight.readOnly) manual = weight.value; };
-    gross.oninput = () => { if (gross.value === '') weight.value = manual; updateWeight(); };
-    empty.oninput = updateWeight;
+    weight.oninput = () => { manual = weight.value; };
+    gross.oninput = empty.oninput = weightMode.onchange = updateWeight;
     updateWeight();
-    fields.append(conditionLabel,grossLabel,emptyLabel,weightLabel);
+    fields.append(conditionLabel,weightModeLabel,grossLabel,emptyLabel,weightLabel,result);
     let place;
     if (returnRoute) {
       place = element('select','');
@@ -441,15 +455,16 @@ function addStockSection(card, profile) {
       const row = element('div','');
       row.className = 'stock-weight-save';
       weightLabel.before(row);
-      row.append(weightLabel,save);
+      row.append(weightLabel,result,save);
       if (mode==='move') {
-        for (const input of [condition,gross,empty,weight]) {
+        result.hidden = true;
+        for (const input of [condition,weightMode,gross,empty,weight]) {
           input.disabled = true;
           const label = input.closest('label');
           if (label) label.hidden = true;
         }
       }
-      const inputs = mode==='move' ? [place] : [condition,gross,empty,weight,place];
+      const inputs = mode==='move' ? [place] : [condition,weightMode,gross,empty,weight,place];
       const original = inputs.map(input=>input.value);
       const updateSaveButton = () => {
         save.hidden = !inputs.some((input,index)=>input.value!==original[index]);
@@ -471,12 +486,16 @@ function addStockSection(card, profile) {
       const stock = readStock();
       const previous = stock.find(item=>item.id===roll?.id);
       const updated = mode==='move' ? {...previous,locationId:place.value} :
-        {...previous,id:roll?.id ?? crypto.randomUUID(),packaging:condition.value,weight:weight.value,gross:gross.value,tare:empty.value};
+        {...previous,id:roll?.id ?? crypto.randomUUID(),packaging:condition.value,weight:weight.value,gross:weightMode.value==='calculated' ? gross.value : '',tare:weightMode.value==='calculated' ? empty.value : (previous?.tare ?? '')};
       if (roll && !stock.some(item=>item.id===roll.id)) { error.textContent = 'Diese Rolle ist nicht mehr im Bestand.'; return; }
       if (place) updated.locationId = place.value;
+      const priorNotice = rollNoticeState;
+      if (roll && mode!=='move') rollNoticeState = {route:location.hash.slice(1),message:'Gespeichert. Änderungen für Rolle '+(index+1)+' übernommen.'};
       const saved = saveStock(roll ? stock.map(item=>item.id===roll.id ? updated : item) : [...stock,updated]);
-      if (!saved) error.textContent = 'Die Änderungen konnten nicht gespeichert werden.';
-      else if (returnRoute) {
+      if (!saved) {
+        rollNoticeState = priorNotice;
+        error.textContent = 'Die Änderungen konnten nicht gespeichert werden.';
+      } else if (returnRoute && mode==='move') {
         const label = mode==='move' ? 'Lagerort' : previous.weight!==updated.weight ? 'Restgewicht' : 'Änderung';
         returnAfterRollSave(returnRoute,label+' für Rolle '+(index+1)+' gespeichert.');
       }
@@ -519,6 +538,7 @@ function addStockSection(card, profile) {
     parts.push(...weightTotals(stock,nominalWeight(card)));
     card.dataset.stockCount = String(stock.length);
     card.querySelector('.inventory-count').textContent = stock.length===1 ? '1 Rolle im Bestand' : stock.length+' Rollen im Bestand';
+    card.querySelector('.detail-stock-summary').textContent = [parts[0].slice('Bestand: '.length),...weightTotals(stock,nominalWeight(card))].join(' · ');
     summary.textContent = parts.join(' · ');
     const add = element('button','Rolle hinzufügen');
     add.type = 'button';
@@ -677,7 +697,9 @@ function prepareCard(card, color, metadata = {}) {
   label.before(cardHeading);
   const inventoryCount = element('p','');
   inventoryCount.className = 'inventory-count';
-  text.append(label,heading,inventoryCount);
+  const detailStock = element('p','');
+  detailStock.className = 'detail-stock-summary';
+  text.append(label,heading,inventoryCount,detailStock);
   if (shade) cardHeading.append(swatch);
   cardHeading.append(text);
   const profile = element('details','');
@@ -1145,11 +1167,12 @@ function renderLocationOverview(message = '', managerOpen = false) {
   transfer.append(selectedCount,controls,save,cancel);
   function refreshSelection() {
     selectedCount.textContent = selected.size+(selected.size===1?' Rolle ausgewählt':' Rollen ausgewählt');
+    controls.hidden = save.hidden = !selected.size;
     const targetName = destination.value==='create' ? newName.value.trim() : destination.selectedOptions[0]?.textContent;
     const targetId = destination.value.startsWith('id:') ? destination.value.slice(3) : '';
     const count = [...selected.values()].filter(item=>destination.value==='create' || item.locationId!==targetId).length;
     save.disabled = !destination.value || !targetName || !count;
-    save.textContent = save.disabled ? 'Umlagern' : (count===1?'1 Rolle':count+' Rollen')+' umlagern – '+targetName;
+    save.textContent = selected.size ? batchLabel(destination.value && count ? count : selected.size,'umlagern') : 'Umlagern';
   }
   destination.onchange = () => {
     newLabel.hidden = destination.value!=='create';
@@ -1399,7 +1422,7 @@ function addLocalQr(card, roll, live = false) {
   address.hash = live ? card.id : sharedPrefix+encoded;
   const section = element('details','');
   section.className = 'local-qr';
-  section.append(element('summary',live ? 'Etikett für meine aktuelle Karte' : 'Karte teilen (Momentaufnahme)'),element('p',live ? 'Das Etikett öffnet die aktuelle Karte in einem Browser, in dem sie gespeichert ist.' : 'Der Link enthält die öffentlichen Filamentdaten zum Zeitpunkt der Erstellung.'));
+  section.append(element('summary',live ? 'QR-Etikett' : 'Filamentdaten teilen'),element('p',live ? 'Das Etikett öffnet die aktuelle Karte in einem Browser, in dem sie gespeichert ist.' : 'Teilt die Filamentdaten als Momentaufnahme, ohne persönlichen Bestand oder eigene Druckwerte.'));
   const message = element('p','');
   message.setAttribute('role','status');
   const copy = element('button','Link kopieren');
@@ -1559,6 +1582,7 @@ function filter() {
   const contexts = [
     ['lagerbestand/','bestand-lagerort'],
     ['bestand/','filament-bestand'],
+    ['etikett/','filament-bestand'],
     ['trocknung/','trocknung'],
     ['beispiel/','beispiele'],
     ['scan-karte/','scan-ergebnis']
@@ -1589,6 +1613,17 @@ function filter() {
     rollNotice.hidden = !rollNoticeState || rollNoticeState.route!==route;
     rollNotice.textContent = rollNotice.hidden ? '' : rollNoticeState.message;
     if (rollNotice.hidden && previousRoute===rollNoticeState?.route) rollNoticeState = null;
+  }
+  if (single && route.startsWith('etikett/') && route!==previousRoute) {
+    const label = target.querySelector('.local-qr');
+    if (label) {
+      label.open = true;
+      requestAnimationFrame(()=>{
+        if (location.hash.slice(1)!==route) return;
+        label.querySelector('summary').focus({preventScroll:true});
+        label.scrollIntoView({block:'start'});
+      });
+    }
   }
   previousRoute = route;
   const locationsView = target === locationOverview;
@@ -1704,7 +1739,7 @@ window.addEventListener('hashchange', () => {
   const route = location.hash.slice(1);
   filter();
   requestAnimationFrame(()=>{
-    if (location.hash.slice(1)===route) window.scrollTo(0,scrollPositions.get(route) ?? 0);
+    if (location.hash.slice(1)===route && !route.startsWith('etikett/')) window.scrollTo(0,scrollPositions.get(route) ?? 0);
   });
 });
 function updateLocalCardColor(card,roll) {
@@ -1735,7 +1770,7 @@ function render() {
       item.append(element('dt',title),element('dd',roll[field] || 'Nicht angegeben'));
       specs.append(item);
     }
-    const edit = element('button','Bearbeiten');
+    const edit = element('button','Filament bearbeiten');
     edit.onclick = () => {
       editReturnRoute = location.hash.slice(1) === 'filament-bestand' ? 'bestand/'+card.id : location.hash.slice(1);
       editing = roll.id;
@@ -2053,8 +2088,8 @@ function captureChoice(title,description,id) {
   button.append(label,help);
   return button;
 }
-const existingButton = captureChoice('Vorhandenes Filament','Rollen zu einer bestehenden Karte hinzufügen','capture-existing');
-const createButton = captureChoice('Neues Filament','Karte und erste Rollen anlegen','capture-new');
+const existingButton = captureChoice('Rolle hinzufügen','Rollen zu einer bestehenden Karte hinzufügen','capture-existing');
+const createButton = captureChoice('Neues Filament anlegen','Karte und erste Rollen anlegen','capture-new');
 existingButton.type = createButton.type = 'button';
 captureActions.append(existingButton,createButton);
 const batchForm = element('form','');
@@ -2084,6 +2119,7 @@ function batchLabel(count,verb) {
 }
 function updateBatchSubmit() {
   batchSubmit.textContent = batchLabel(existingBatch.quantity.valueAsNumber || 1,'hinzufügen');
+  existingBatch.fields.hidden = existingBatch.fields.disabled = batchSubmit.hidden = !selectedCard;
   batchSubmit.disabled = !selectedCard || !existingBatch.quantity.validity.valid;
 }
 function renderCaptureMatches() {
@@ -2126,15 +2162,27 @@ function showCapture(mode) {
     updateCardSave();
   }
 }
-function finishCapture(cardId,count) {
+function finishCapture(cardId,count,created = false) {
   const link = element('a','Zur Filamentkarte');
   link.href = '#bestand/'+cardId;
   const more = element('button','Weitere Rollen erfassen');
   more.type = 'button';
   more.onclick = () => { showCapture('menu'); existingButton.focus(); };
-  const message = element('p',batchLabel(count,'hinzugefügt')+'.');
+  const message = element('h2',created ? 'Filament angelegt · '+(count===1?'1 Rolle':count+' Rollen') : batchLabel(count,'hinzugefügt'));
   message.tabIndex = -1;
-  captureDone.replaceChildren(message,link,element('br',''),more);
+  const actions = element('div','');
+  actions.className = 'role-shortcuts';
+  if (created || document.getElementById(cardId)?.hasAttribute('data-local')) {
+    const label = element('a','QR-Etikett anzeigen');
+    label.href = '#etikett/'+cardId;
+    label.className = 'role-action-link action-primary';
+    actions.append(label);
+  }
+  link.className = 'role-action-link';
+  more.className = 'action-secondary';
+  actions.append(link,more);
+  captureDone.className = 'work-panel';
+  captureDone.replaceChildren(message,actions);
   showCapture('done');
   message.focus();
 }
@@ -2266,7 +2314,7 @@ form.onsubmit = event => {
   clearEditor();
   search.value = '';
   render();
-  if (batch) finishCapture(cardId,batch.length);
+  if (batch) finishCapture(cardId,batch.length,true);
   else location.hash = returnRoute || 'bestand/'+cardId;
   status.textContent = 'Gespeichert';
 };
@@ -2557,7 +2605,7 @@ function renderPrinters() {
     for (const item of printerNozzles(printer)) list.append(element('li',nozzleName(printer,item.position)+(item.diameter?' · '+item.diameter+' mm':'')));
     entry.append(list);
     const edit = element('details','');
-    edit.append(element('summary','Drucker bearbeiten'));
+    edit.append(element('summary','Drucker bearbeiten'),element('p','Neue Düsen kannst du anschließend unter „Eigene Druckwerte“ auf jeder Filamentkarte auswählen.'));
     const form = element('form','');
     const fields = element('div','');
     fields.className = 'fields';
@@ -2645,8 +2693,8 @@ renderNozzleFields();
 const dryingStates = {
   due:{label:'Fällig',rank:0},
   soon:{label:'Bald fällig',rank:1},
-  planned:{label:'Eingeplant',rank:2},
-  open:{label:'Offen',rank:3}
+  planned:{label:'Geplant',rank:2},
+  open:{label:'Kein Termin',rank:3}
 };
 const dayInMs = 86400000;
 function validDryingInterval(days) {
@@ -2755,7 +2803,9 @@ function renderDryingDashboard() {
       report(saved ? (roll.dryingDue ? 'Manuelle Markierung entfernt.' : 'Rolle als fällig markiert.') : 'Die Markierung konnte nicht gespeichert werden.');
     };
     actions.append(mark);
-    view.append(history,intervalEditor(item),actions,rollActionLink(card.id,roll.id,'trocknung','Rolle bearbeiten'));
+    const options = element('details','');
+    options.append(element('summary','Weitere Trocknungsoptionen'),intervalEditor(item),actions,rollActionLink(card.id,roll.id,'trocknung','Rolle bearbeiten'));
+    view.append(history,options);
     return view;
   });
   if (!dryingSealed.checked && sealed) entries.push(element('p',sealed+(sealed===1?' originalverpackte Rolle ausgeblendet.':' originalverpackte Rollen ausgeblendet.')));
