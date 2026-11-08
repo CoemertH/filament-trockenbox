@@ -470,7 +470,7 @@ function addStockSection(card, profile) {
       if (place) updated.locationId = place.value;
       const saved = saveStock(roll ? stock.map(item=>item.id===roll.id ? updated : item) : [...stock,updated],roll?.id);
       if (!saved) error.textContent = 'Die Änderungen konnten nicht gespeichert werden.';
-      else if (returnRoute) location.hash = returnRoute;
+      else if (returnRoute) window.location.hash = returnRoute;
     };
     editor.append(error);
     if (roll && !returnRoute) {
@@ -564,7 +564,7 @@ function addStockSection(card, profile) {
   rollEditors.set(card,(roll,index,returnRoute)=>{
     const history = dryingHistory(roll,session=>{
       const saved = saveDrying(roll.id,session);
-      if (saved) location.hash = returnRoute;
+      if (saved) window.location.hash = returnRoute;
       return saved;
     });
     history.querySelector('summary').textContent = 'Trocknung erfassen';
@@ -1828,7 +1828,7 @@ function renderRolePanel(item) {
   if (!item) { rolePanel.replaceChildren(element('p','Diese Rolle ist nicht mehr im Bestand.')); return; }
   const {card,roll,index,returnRoute} = item;
   const label = card.querySelector('h2').textContent+' · '+card.dataset.color;
-  rolePanel.replaceChildren(element('h2',label),element('p','Rolle '+(index+1)),
+  rolePanel.replaceChildren(element('h2',label),
     ...rollEditors.get(card)(roll,index,returnRoute));
 }
 const scanResultPrefix = 'scan-ergebnis/';
