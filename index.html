@@ -20,24 +20,27 @@ article:target > .open-roll{display:none}
 .local-qr img{max-width:100%;height:auto}.local-qr button{margin-inline-end:.45rem}
 .filament-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-bottom:.8rem}.filament-actions button{margin:0;padding:.6rem .45rem}.filament-actions button:disabled{background:transparent;color:var(--muted);border:1px solid #58716e;cursor:default}
 #filament-scanner{padding:.85rem;margin-bottom:1rem;border:1px solid #58716e;border-radius:.7rem}#scan-video{display:block;width:100%;max-height:18rem;object-fit:contain;background:#10161c;margin-bottom:.6rem}
+#main-menu a{background:#18242c}#main-menu a:hover,#main-menu a:focus-visible{background:#24443d}#scan-view>button{margin-bottom:.7rem}
 </style>
 <main>
 <header><h1>Filamentlager</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
 <a id="all-rolls" href="./" hidden>← Alle Rollen</a>
 <nav id="main-menu" aria-label="Hauptmenü">
-  <a id="menu-filaments" href="./" aria-current="page">Filament Bestand</a>
+  <a id="menu-filaments" href="#filament-bestand">Filament Bestand</a>
   <a id="menu-locations" href="#bestand-lagerort">Bestand Lagerort</a>
+  <a id="new-filament" href="#filament-anlegen">Neues Filament anlegen</a>
+  <a id="menu-scan" href="#filament-scannen">Filament scannen</a>
 </nav>
 <section id="bestand-lagerort" aria-labelledby="location-stock-title" hidden>
   <h2 id="location-stock-title">Bestand Lagerort</h2>
   <p>Hier siehst du, welche Rollen an welchem Lagerort liegen.</p>
   <div id="location-stock-groups"></div>
 </section>
-<div id="overview">
-<div class="filament-actions" aria-label="Filament hinzufügen">
-  <button id="new-filament" type="button" aria-expanded="false" aria-controls="filament-editor">Neues Filament anlegen</button>
-  <button id="scan-open" type="button" aria-expanded="false" aria-controls="filament-scanner">Filament scannen</button>
-</div>
+<details id="filament-editor" hidden><summary hidden>Filamentdaten</summary>
+<form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Material<input name="material" required maxlength="100"></label><label>Farbe<input name="farbe" required maxlength="60"></label><label>Durchmesser<input name="durchmesser" placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" placeholder="500 g"></label><label>Drucktemperatur<input name="druck" placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" placeholder="70 °C · 8 Stunden"></label></div><button id="card-save">Filamentkarte speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
+<section id="scan-view" aria-labelledby="scan-title" hidden>
+<h2 id="scan-title">Filament scannen</h2>
+<button id="scan-open" type="button" aria-expanded="false" aria-controls="filament-scanner">Scanner öffnen</button>
 <section id="filament-scanner" aria-label="Filament scannen" hidden>
   <p>Halte den QR-Code vor die Kamera oder wähle ein Foto des Codes.</p>
   <video id="scan-video" autoplay muted playsinline hidden></video>
@@ -45,11 +48,12 @@ article:target > .open-roll{display:none}
   <button id="scan-close" type="button">Scanner schließen</button>
   <p id="scan-status" role="status"></p>
 </section>
-<details id="filament-editor"><summary hidden>Filamentdaten</summary>
-<form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Material<input name="material" required maxlength="100"></label><label>Farbe<input name="farbe" required maxlength="60"></label><label>Durchmesser<input name="durchmesser" placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" placeholder="500 g"></label><label>Drucktemperatur<input name="druck" placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" placeholder="70 °C · 8 Stunden"></label></div><button id="card-save">Filamentkarte speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
+</section>
+<div id="overview" hidden>
+
 <label for="search">Rollen suchen</label><input id="search" type="search" placeholder="Material oder Farbe">
 <div class="fields" style="margin-top:.75rem"><label>Material<select id="material-filter"></select></label><label>Farbe<select id="color-filter"></select></label></div><label class="available-filter"><input id="available-only" type="checkbox"> Nur verfügbare Filamente</label></div>
-<section id="cards" aria-label="Filamentrollen">
+<section hidden id="cards" aria-label="Filamentrollen">
 <article id="support-pla-petg-schwarz">
   <span class="label">Rolle 01 · Schwarz</span>
   <h2>Bambu Lab Stützmaterial für PLA/PETG</h2>
@@ -233,7 +237,7 @@ article:target > .open-roll{display:none}
 </section>
 <p id="empty" hidden>Keine passende Rolle gefunden.</p>
 
-<details id="backup"><summary>Datensicherung</summary>
+<details id="backup" hidden><summary>Datensicherung</summary>
 <p>Sichere eigene Filamentkarten, X2D-Druckwerte, Bestände und Leergewichte. Die Datei kannst du auch in einem anderen Browser importieren.</p>
 <button id="backup-export" type="button">Sicherung exportieren</button>
 <label>Sicherung auswählen<input id="backup-file" type="file" accept=".json,application/json"></label>
@@ -921,8 +925,6 @@ function updateFilterOptions() {
   }
 }
 const menu = document.querySelector('#main-menu');
-const filamentMenuLink = document.querySelector('#menu-filaments');
-const locationMenuLink = document.querySelector('#menu-locations');
 const locationOverview = document.querySelector('#bestand-lagerort');
 const locationGroups = document.querySelector('#location-stock-groups');
 function stockForCard(cardId) {
@@ -1249,27 +1251,31 @@ function filter() {
   const single = target?.parentElement === cards;
   const stockDetail = single && route.startsWith(stockPrefix);
   cards.classList.toggle('stock-detail',stockDetail);
-  back.href = stockDetail ? '#bestand-lagerort' : './';
-  back.textContent = stockDetail ? '← Bestand Lagerort' : '← Alle Rollen';
+  back.href = stockDetail ? '#bestand-lagerort' : single ? '#filament-bestand' : './';
+  back.textContent = stockDetail ? '← Bestand Lagerort' : single ? '← Alle Rollen' : '← Hauptmenü';
   if (stockDetail && route!==previousRoute) target.querySelector('.locations').open = true;
   previousRoute = route;
   const locationsView = target === locationOverview;
-  menu.hidden = single;
-  overview.hidden = single || locationsView;
-  back.hidden = !single;
-  cards.hidden = locationsView;
+  const inventoryView = route==='filament-bestand';
+  const createView = route==='filament-anlegen';
+  const scanningView = route==='filament-scannen';
+  const home = !single && !locationsView && !inventoryView && !createView && !scanningView;
+  menu.hidden = !home;
+  overview.hidden = !inventoryView;
+  back.hidden = home;
+  cards.hidden = !single && !inventoryView;
   locationOverview.hidden = !locationsView;
-  form.closest('details').hidden = single || locationsView;
-  document.querySelector('#backup').hidden = single || locationsView;
-  filamentMenuLink.setAttribute('aria-current',locationsView ? 'false' : 'page');
-  locationMenuLink.setAttribute('aria-current',locationsView ? 'page' : 'false');
+  filamentEditor.hidden = !createView;
+  filamentEditor.open = createView;
+  scanView.hidden = !scanningView;
+  document.querySelector('#backup').hidden = !inventoryView;
   if (locationsView) renderLocationOverview();
   const query = search.value.trim().toLocaleLowerCase('de');
   for (const card of cards.children) {
     const matches = [...card.querySelectorAll('h2,.label')].some(node => node.textContent.toLocaleLowerCase('de').includes(query));
     card.hidden = single ? card !== target : !matches || (availableOnly.checked && card.dataset.stockCount === '0') || (materialFilter.value && card.dataset.material !== materialFilter.value) || (colorFilter.value && card.dataset.color !== colorFilter.value);
   }
-  document.querySelector('#empty').hidden = locationsView || [...cards.children].some(card => !card.hidden);
+  document.querySelector('#empty').hidden = !inventoryView || [...cards.children].some(card => !card.hidden);
 }
 materialFilter.onchange = colorFilter.onchange = availableOnly.onchange = filter;
 window.addEventListener('hashchange', () => { filter(); window.scrollTo(0,0); });
@@ -1291,7 +1297,8 @@ function render() {
     edit.onclick = () => {
       editing = roll.id;
       for (const field of form.querySelectorAll('input')) field.value = roll[field.name] ?? ''; 
-      form.closest('details').open = true;
+      location.hash = 'filament-anlegen';
+      filter();
       reset.hidden = false;
       status.textContent = '';
       updateCardSave();
@@ -1307,14 +1314,8 @@ function render() {
 }
 const cardSave = document.querySelector('#card-save');
 const filamentEditor = form.closest('details');
-const newFilament = document.querySelector('#new-filament');
-newFilament.onclick = () => {
-  filamentEditor.open = !filamentEditor.open;
-  if (filamentEditor.open) form.elements.material.focus();
-};
-filamentEditor.addEventListener('toggle',() => {
-  newFilament.setAttribute('aria-expanded',String(filamentEditor.open));
-});
+const scanView = document.querySelector('#scan-view');
+document.querySelector('#new-filament').onclick = () => { clearEditor(); status.textContent = ''; };
 function updateCardSave() {
   const savedCard = rolls.find(roll=>roll.id===editing);
   const changed = !savedCard || [...form.querySelectorAll('input')].some(input=>input.value!==(savedCard[input.name] ?? ''));
@@ -1343,6 +1344,7 @@ form.onsubmit = event => {
     show.onclick = () => {
       search.value = materialFilter.value = colorFilter.value = '';
       availableOnly.checked = false;
+      location.hash = duplicate.id;
       filter();
       const stock = duplicate.querySelector('.stock');
       stock.open = true;
@@ -1359,6 +1361,7 @@ form.onsubmit = event => {
   clearEditor();
   search.value = '';
   render();
+  location.hash = 'eigene-rolle-' + roll.id;
   status.textContent = 'Gespeichert';
 };
 
@@ -1586,6 +1589,12 @@ scanPhoto.onchange = async () => {
     URL.revokeObjectURL(url);
     if (session===scanSession) scanPhoto.value = '';
   }
+};
+document.querySelector('#menu-scan').onclick = event => {
+  event.preventDefault();
+  history.pushState(null,'','#filament-scannen');
+  filter();
+  scanOpen.click();
 };
 document.querySelector('#scan-close').onclick = () => { closeScanner(); scanOpen.focus(); };
 window.addEventListener('hashchange',closeScanner);
