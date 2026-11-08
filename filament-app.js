@@ -2071,7 +2071,7 @@ function saveSelectedColor(name) {
 function clearEditor() {
   editing = null;
   editReturnRoute = '';
-  form.reset();
+  HTMLFormElement.prototype.reset.call(form);
   colorInput.value = readColorDraft();
   colorPicker.open = false;
   updateColorPalette();
