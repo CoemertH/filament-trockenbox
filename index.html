@@ -42,6 +42,12 @@ article:target > .open-roll{display:none}
 .location-stock-toolbar{display:flex;flex-wrap:wrap;gap:.6rem;margin:.8rem 0}
 .location-stock-toolbar button{margin:0;max-width:100%}.location-manager-feedback:empty{display:none}
 @media (max-width:35rem){.location-stock-toolbar{align-items:flex-start;flex-direction:column}}
+.color-picker{grid-column:1/-1;min-width:0;margin:0;padding:.65rem;border:1px solid #38514f;border-radius:.7rem}
+.color-picker legend{padding:0 .3rem;font-weight:700}
+.color-palette{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,4.35rem),1fr));gap:.35rem;margin-bottom:.65rem}
+.color-palette button{display:grid;justify-items:center;align-content:center;gap:.25rem;min-height:3.5rem;margin:0;padding:.3rem .15rem;border:1px solid transparent;background:#111b21;color:inherit;font-size:.75rem;overflow-wrap:anywhere}
+.color-palette button[aria-pressed=true]{border-color:var(--mint);background:#23383e;color:var(--mint)}
+.color-palette .swatch{width:1.55rem;border-width:1px}
 </style>
 <main>
 <header><h1>Filamentlager</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -59,7 +65,7 @@ article:target > .open-roll{display:none}
   <div id="location-stock-groups"></div>
 </section>
 <details id="filament-editor" hidden><summary hidden>Filamentdaten</summary>
-<form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Material<input name="material" required maxlength="100"></label><label>Farbe<input name="farbe" required maxlength="60"></label><label>Durchmesser<input name="durchmesser" placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" placeholder="500 g"></label><label>Drucktemperatur<input name="druck" placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" placeholder="70 °C · 8 Stunden"></label><label>Produktseite beim Hersteller (optional)<input name="produktseite" type="url" placeholder="https://…"></label></div><button id="card-save">Filamentkarte speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
+<form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Material<input name="material" required maxlength="100"></label><fieldset class="color-picker"><legend>Farbe</legend><div class="color-palette" aria-label="Gängige Farben"></div><label>Farbname<input name="farbe" required maxlength="60" placeholder="Farbe auswählen oder eigenen Namen eingeben"></label></fieldset><label>Durchmesser<input name="durchmesser" placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" placeholder="500 g"></label><label>Drucktemperatur<input name="druck" placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" placeholder="70 °C · 8 Stunden"></label><label>Produktseite beim Hersteller (optional)<input name="produktseite" type="url" placeholder="https://…"></label></div><button id="card-save">Filamentkarte speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
 <section id="meine-drucker" aria-labelledby="printer-title" hidden>
   <h2 id="printer-title">Meine Drucker</h2>
   <div id="printer-list"></div>
@@ -326,7 +332,7 @@ const overview = document.querySelector('#overview');
 const availableOnly = document.querySelector('#available-only');
 const back = document.querySelector('#all-rolls');
 const qrCodes = {"support-pla-petg-schwarz":"/uaaI/wWnoMQbrZtdLt0mZn126sBAq7BOQXFB/qqqq/gB54pAJ/NEZy5qXUrrqnv9tWqONXxEPg5WrkwtDzQ3GKIXOPr8q2wM2xLenNbOo6QMag2n7REOsqXNJkX720afGySqZhQnk4U5S2utCA+12dZmgRkAZ2nPePAF6codWYNWWJxtf8AcK0UW/rd7yowWzIbE7qIob+d17Bo8W6Oi2MrBKLiLf/p6JjQgA==","petg-matt-gruen-03460604a":"/jdry/wRQqTQbrUvhrt11qWF264J0K7BdJV5B/qqqq/gE1GnAL4gKXPjbFwfCbzXApyOMWFPOhQthg/rlB5+xIBb1zNffzcNsLADGpB7q6LrXUuAs2S9V4tOPXqTstUv7g7eToQhPC6o922RQIfw6skgfrVl/D5JL/QCh49R4UhsuOUkN/4AQ26cY/hPEqrwWR2VG7qSkf+91rncNm68eSoPBB5eOR/vVD5rgA==","sunlu-pla-plus-weiss":"/qGYA/wUwoNQbr5NdLt0tJn126kxQq7BCAfFB/qqqq/gCj5tAJ/VFzy5jdU7zoCO9teLiBHzE/Urmqkw0FDS3GC4JOPz/Cgw92z6ynfSOqHQMYgfyrRGOhsTNJkUu40KfFZ1qZhSLZ4UbSUKNCR+RnNfngSIgZjHMsfAF6cKhWYdWSixtf6AWa8UW/qN5qowUXKbE7rYrR+d1xB58W6LiUMrBIbCIf/uyYiwgA==","sunlu-pla-plus-rot":"/twbA/wVNo9QbrUtVLt0U5v126kJQq7BK8XFB/qqqq/gCX5tAJ+2F7y8CdUnzobqdveLKI3yE/VsGrkwrPHS3GN4POPz4r9w92zC0HdSPEEwMYgVwrRGOotXNpkbsK0afFLkqZhTqlYUbSyb9CR+okFfngep8ZjHNcXAN6dAHWcdSaZRtf+AUK8UW/pl5qowULKbE7qCrR+d1ZB58W6PCUMrBArCIf/siYiwgA==","sunlu-petg-matt-orange":"/l9BQ/wQ7mDQbqjJort1eIWl26o9lK7BYKVZB/qqqq/gEC2nAL4Tg/Pk4JlKSY2VZLyv6KZ/OxawFw/rrGxe5IKLzqrXf5FB9HAiMDp+qS7eCGu41oKfVlL5DnqYvAQ/7kSdboQjH/84f2aSDMfwVvuE87QsiWtJKpLkhe8oCnhsibl1N/+Ac0ycY/kGiqrwUNERG7qcP/+91dwNNm62GyoPBLFMGR/oxC5rgA==","sunlu-petg-matt-blau":"/iZDQ/wSvmDQbrNport1UYWl26wV1K7BQedZB/qqqq/gGl3nAL5dhfPi7klKSYXKZLyv0sJ8OxPg9x/r7LNc5ICsLqrXcjRBNHCWnj7+qMIOCGuEwQK/VrqtD3qQOcQv7koGboQhn9cwf24IzMfw84mE87UHaXtJKM7khe96cnhsmXCVN/+AQUycY/hGiqrwUZERG7rWP/+91UwNNm6tGyoPBHVMGR/tpC5rgA==","sunlu-pla-plus-schwarz":"/mRBa/wQJmDQbqqpxrt1eoWF26490K7BU6ZJB/qqqq/gGG3jAL4Rg3Pk6ZlaCYnXZL6vq7Z9KxagFx/rrGxe5ICLRqLXb5EBsHA+2jr2qgOOGWu4koKdVhHpD3qavQQu7kS/bIQiH+8g/3eaTIfwnruE87WlmWtJItTkhe9LOntsibl1J/+Ac0ycY/kWiyrwUBEVG7qQP1+91RwINm60GwoPBLFMGR/oxD5rgA==","sunlu-pla-plus-klein-blau":"/hxpa/wRQqDQbrVPprt19qeF26oJkK7BRJVJB/qqqq/gH9GjAL5iKfPiZVwKCbjRAp6uUEFMKxY8hg/rlBx85IF7xzrXd7ON8HBLvpL2qIr7SWuEt2S9V8hePHqTo9U+7g7+ToQhPb6g/3QRgIfw+iEi87flPCtJJ/QChe8RwVtsuPUkN/4AYWycY/hfGyrwVR2VG7qQm9+91unINm68ewoPBA5MGR/vVD5rgA==","bambu-lab-pla-matt-grau":"/rayA/wTj4RQbq85XLt0YO6l26V8Zi7BUEcBB/qqqq/gAaVxAKNE8JkqbOU6m8rGtGeiuHMFL4i1y7kwuKvsraTqFE95vhZpInkjEEkbH+5ibPnGmlJkOtEsdUwOqZiZNTKk3M0GuZXdyb6qpFW5o3nxPwGFRR7beaW0XsJg+wBYPL1pkPyAXvz0R/scdyowRzlHErpeTp+N0MBspC6vy9FjBHw1HY/ueIi0gA==","sunlu-abs-hs-schwarz":"/iVDS/wStmTQbrVp5rt1c4WF26hVlK7BYORJB/qqqq/gEt2jAL51hXPj4hlLCYmsZJ6vkPJ9CxPx9w/r7LNcxIGNtqtXajTBNHCaWj7eqGJeCGuAgQKdVtqNDkqQKMQv7g4kbqQhvk8w/2cEjMfwJweEc7UH6XtJKI7kp+97cnlsmWCVN/+AYUycY/lGiyrwWdEVG7raP/+91RwINm6pGwoPBGVPOR/spC5rgA==","bambu-lab-pla-basic-beige":"/hZp6/wRiqDQbrVv5rt19KWF264JkK7BVJdJB/qqqq/gE9HjAL4kK/Pi4QwKCbDVApzOc2FNCxQthh/rlBx+5IF6XyLPZzuNsDCLNJL2qaMrSGuI1WSfV8peP2iTo9Uv7gr+ToQjDLa4f20RQMfwqkMiUrbh/CpJL5ACha9R8Vl8uvQkJv4AQWy8Y/nfEqrwVd3VG7rWk/+912nINm68eyoPBD5/OR/uVC5vgA==","bambu-lab-pla-matt-marineblau":"/sfFG/wQloNQbo3xZLt1SUCV26xoV67BZolxB/qqqq/gHb2SAIvuP4fJxPUth53GuF9B0fibF2Y3lsj3lIHw3GCsTLz3lIaRgfeyr44HbiUjO+WRothc2Iov63ThIEXo8jg3wLzDKi0uR4SVnPY3BuI+I3ZolAnHCYY6ZiBxYJ5gzb5V4fsAeeKEQ/uEnKoQQoGlHLrrj4/90kEruG6LwemBBDe7JW/sBPlzgA=="};
-const colors = {Schwarz:'#131313',Weiß:'#fff',Rot:'#d23936',Grün:'#38a55a',Orange:'#f88733',Blau:'#355fe6','Klein-Blau':'#1729ab',Grau:'#9b9ea0',Beige:'#f7e6de',Marineblau:'#0078bf'};
+const colors = {Schwarz:'#131313',Weiß:'#fff',Rot:'#d23936',Grün:'#38a55a',Orange:'#f88733',Blau:'#355fe6','Klein-Blau':'#1729ab',Grau:'#9b9ea0',Beige:'#f7e6de',Marineblau:'#0078bf',Gelb:'#f4d542',Rosa:'#e884ae',Lila:'#8d58c8',Türkis:'#23a99e',Braun:'#87583e',Silber:'#b9c3cc',Gold:'#d6ad4a'};
 const dryingByDevice = {
   'support-pla-petg-schwarz': ['Umluft-Trockenschrank · 75 °C · 8 Stunden'],
   'petg-matt-gruen-03460604a': ['SUNLU S4 oder E2 · 65 °C · mindestens 8 Stunden (Vergleichswert, Marke unbestätigt)'],
@@ -1711,7 +1717,8 @@ function render() {
     const edit = element('button','Bearbeiten');
     edit.onclick = () => {
       editing = roll.id;
-      for (const field of form.querySelectorAll('input')) field.value = roll[field.name] ?? ''; 
+      for (const field of form.querySelectorAll('input')) field.value = roll[field.name] ?? '';
+      updateColorPalette();
       location.hash = 'filament-anlegen';
       filter();
       reset.hidden = false;
@@ -1727,6 +1734,30 @@ function render() {
   updateFilterOptions();
   filter();
 }
+const colorInput = form.elements.farbe;
+const palette = form.querySelector('.color-palette');
+function updateColorPalette() {
+  const current = colorInput.value.trim().toLocaleLowerCase('de');
+  for (const button of palette.children) {
+    button.setAttribute('aria-pressed',String(button.textContent.toLocaleLowerCase('de')===current));
+  }
+}
+for (const [name,hex] of Object.entries(colors)) {
+  const button = element('button','');
+  button.type = 'button';
+  const circle = element('span','');
+  circle.className = 'swatch';
+  circle.style.setProperty('--swatch',hex);
+  circle.setAttribute('aria-hidden','true');
+  button.append(circle,name);
+  button.onclick = () => {
+    colorInput.value = name;
+    colorInput.dispatchEvent(new Event('input',{bubbles:true}));
+  };
+  palette.append(button);
+}
+colorInput.addEventListener('input',updateColorPalette);
+updateColorPalette();
 const cardSave = document.querySelector('#card-save');
 const filamentEditor = form.closest('details');
 const scanView = document.querySelector('#scan-view');
@@ -1742,6 +1773,7 @@ form.addEventListener('change',updateCardSave);
 function clearEditor() {
   editing = null;
   form.reset();
+  updateColorPalette();
   reset.hidden = true;
   updateCardSave();
 }
