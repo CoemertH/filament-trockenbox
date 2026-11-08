@@ -4,6 +4,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Filament Bestand</title>
 <link rel="stylesheet" href="./filament.css">
+<style>
+.drying-dashboard-card{padding:.8rem 1rem;margin:.65rem 0}
+.drying-dashboard-card h3{margin:.2rem 0;overflow-wrap:anywhere}
+.drying-dashboard-card p,.drying-dashboard-card ul{margin:.35rem 0}
+.drying-dashboard-card summary{overflow-wrap:anywhere}
+.drying-state{display:inline-flex;align-items:center;gap:.35rem;font-weight:700}
+.drying-state::before{content:"";width:.7rem;height:.7rem;border-radius:50%;background:var(--signal)}
+.drying-state[data-state=due]{--signal:#ff7777}
+.drying-state[data-state=soon]{--signal:#f7cf61}
+.drying-state[data-state=planned]{--signal:#83dfa2}
+.drying-state[data-state=open]{--signal:#b0c2c7}
+.drying-dashboard-card .drying-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.55rem;margin-top:.65rem}
+.drying-dashboard-card .drying-actions button{margin:0}
+</style>
 <main>
 <header><h1>Filamentlager</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
 <a id="all-rolls" href="./" hidden>← Alle Rollen</a>
@@ -13,8 +27,16 @@
   <a id="new-filament" href="#filament-anlegen">Neues Filament anlegen</a>
   <a id="menu-scan" href="#filament-scannen">Filament scannen</a>
   <a href="#meine-drucker">Meine Drucker</a>
+  <a href="#trocknung">Trocknung</a>
   <a href="#datensicherung">Datensicherung</a>
 </nav>
+<section id="trocknung" aria-labelledby="drying-dashboard-title" hidden>
+  <h2 id="drying-dashboard-title">Trocknung</h2>
+  <p>Die Ampel zeigt geplante Termine anhand deiner Intervalle und Einträge.</p>
+  <label class="available-filter"><input id="drying-show-sealed" type="checkbox"> Originalverpackte Rollen anzeigen</label>
+  <p id="drying-dashboard-status" role="status"></p>
+  <div id="drying-dashboard-rolls"></div>
+</section>
 <section id="bestand-lagerort" aria-labelledby="location-stock-title" hidden>
   <h2 id="location-stock-title">Bestand Lagerort</h2>
   <p>Hier siehst du, welche Rollen an welchem Lagerort liegen.</p>
@@ -237,7 +259,7 @@
 <p id="missing-local-card" hidden>Diese Filamentkarte ist in diesem Browser nicht gespeichert. Importiere deine Datensicherung, um das Etikett hier zu öffnen.</p>
 
 <section id="datensicherung" aria-labelledby="backup-title" hidden><h2 id="backup-title">Datensicherung</h2>
-<p>Sichere eigene Karten, Druckprofile, Bestände, Lagerorte, deren Reihenfolge und Trocknungsverläufe. Die Datei kannst du auch in einem anderen Browser importieren.</p>
+<p>Sichere eigene Karten, Druckprofile, Bestände, Lagerorte, deren Reihenfolge, Trocknungsverläufe und Trocknungsintervalle. Die Datei kannst du auch in einem anderen Browser importieren.</p>
 <button id="backup-export" type="button">Sicherung exportieren</button>
 <label>Sicherung auswählen<input id="backup-file" type="file" accept=".json,application/json"></label>
 <p id="backup-status" role="status"></p>
@@ -267,5 +289,5 @@
     <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
 </template>
 <script src="./filament-stock.js"></script>
-<script src="./filament-app.js?v=3"></script>
+<script src="./filament-app.js?v=4"></script>
 </html>
