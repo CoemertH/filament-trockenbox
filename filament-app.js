@@ -490,7 +490,7 @@ function addStockSection(card, profile) {
       if (roll && !stock.some(item=>item.id===roll.id)) { error.textContent = 'Diese Rolle ist nicht mehr im Bestand.'; return; }
       if (place) updated.locationId = place.value;
       const priorNotice = rollNoticeState;
-      if (roll && mode!=='move') rollNoticeState = {route:location.hash.slice(1),message:'Gespeichert. Änderungen für Rolle '+(index+1)+' übernommen.'};
+      if (roll && mode!=='move') rollNoticeState = {route:window.location.hash.slice(1),message:'Gespeichert. Änderungen für Rolle '+(index+1)+' übernommen.'};
       const saved = saveStock(roll ? stock.map(item=>item.id===roll.id ? updated : item) : [...stock,updated]);
       if (!saved) {
         rollNoticeState = priorNotice;
@@ -1992,7 +1992,7 @@ function renderScanResult(card,id) {
       const signal = element('span',dryingStates[state].label);
       signal.className = 'drying-state';
       signal.dataset.state = state;
-      const label = state==='open' ? 'Trocknung: Termin offen' : 'Trocknung: '+dryingStates[state].label;
+      const label = state==='open' ? 'Trocknung: Kein Termin' : 'Trocknung: '+dryingStates[state].label;
       signal.textContent = label;
       entry.append(element('strong','Rolle '+(index+1)),element('p',[
         places.get(roll.locationId) ?? 'Lagerort nicht angegeben',weightDescription(roll,nominal)
