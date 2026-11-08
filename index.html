@@ -92,6 +92,10 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
 .drying-dashboard-card .drying-history>summary{display:list-item;width:fit-content;padding:.55rem .65rem;border-radius:.6rem;background:var(--mint);color:#10261e;font-weight:700}
 .drying-dashboard-card .drying-history[open]>summary{margin-bottom:.45rem}
 @media(max-width:360px){.action-grid,.capture-actions{grid-template-columns:1fr}}
+.first-run h2{margin-top:.15rem}
+.first-run .action-card{text-decoration:none}
+.first-import{display:inline-flex;align-items:center;min-height:44px}
+.demo-view .inventory-count,.demo-detail>article>:not(.card-heading):not(.demo-manufacturer){display:none!important}
 </style>
 <main>
 <nav id="page-navigation" aria-label="Seitennavigation" hidden>
@@ -132,6 +136,16 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
   </a>
   <a class="dashboard-backup" href="#datensicherung"><svg class="dashboard-icon" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg> Datensicherung</a>
 </nav>
+<section id="first-run" class="work-panel first-run" aria-labelledby="first-run-title" hidden>
+  <h2 id="first-run-title">Dein Filamentlager</h2>
+  <p>Erfasse deine Rollen, damit du Lagerort, Restgewicht und Trocknung im Blick hast. Dein Bestand wird in diesem Browser gespeichert.</p>
+  <div class="action-grid">
+    <a id="first-capture" class="action-card action-primary" href="#filament-anlegen" aria-labelledby="first-capture-title" aria-describedby="first-capture-help"><strong id="first-capture-title">Erste Rolle erfassen</strong><small id="first-capture-help">Name, Material, Farbe und Anzahl eingeben</small></a>
+    <a class="action-card action-secondary" href="#beispiele" aria-labelledby="first-demo-title" aria-describedby="first-demo-help"><strong id="first-demo-title">Beispiel ansehen</strong><small id="first-demo-help">Filamentkarten kennenlernen</small></a>
+  </div>
+  <a class="first-import" href="#datensicherung">Sicherung importieren</a>
+</section>
+<p id="demo-notice" class="work-panel" hidden>Das sind Beispielkarten. Sie zählen nicht zu deinem Bestand.</p>
 <section id="trocknung" aria-labelledby="page-title" hidden>
   
   <p>Die Ampel zeigt geplante Termine anhand deiner Intervalle und Einträge.</p>
@@ -394,5 +408,5 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
     <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
 </template>
 <script src="./filament-stock.js"></script>
-<script src="./filament-app.js?v=9"></script>
+<script src="./filament-app.js?v=10"></script>
 </html>
