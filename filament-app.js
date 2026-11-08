@@ -21,6 +21,18 @@ const colorFilter = document.querySelector('#color-filter');
 const overview = document.querySelector('#overview');
 const availableOnly = document.querySelector('#available-only');
 const back = document.querySelector('#all-rolls');
+const pageNavigation = document.querySelector('#page-navigation');
+const pageTitle = document.querySelector('header h1');
+const homeIntro = document.querySelector('header p');
+const pageTitles = {
+  'filament-bestand':'Filamentbestand',
+  'bestand-lagerort':'Bestand nach Lagerort',
+  'filament-anlegen':'Neues Filament anlegen',
+  'filament-scannen':'Filament scannen',
+  'meine-drucker':'Meine Drucker',
+  'trocknung':'Trocknung',
+  'datensicherung':'Datensicherung'
+};
 const qrCodes = {"support-pla-petg-schwarz":"/uaaI/wWnoMQbrZtdLt0mZn126sBAq7BOQXFB/qqqq/gB54pAJ/NEZy5qXUrrqnv9tWqONXxEPg5WrkwtDzQ3GKIXOPr8q2wM2xLenNbOo6QMag2n7REOsqXNJkX720afGySqZhQnk4U5S2utCA+12dZmgRkAZ2nPePAF6codWYNWWJxtf8AcK0UW/rd7yowWzIbE7qIob+d17Bo8W6Oi2MrBKLiLf/p6JjQgA==","petg-matt-gruen-03460604a":"/jdry/wRQqTQbrUvhrt11qWF264J0K7BdJV5B/qqqq/gE1GnAL4gKXPjbFwfCbzXApyOMWFPOhQthg/rlB5+xIBb1zNffzcNsLADGpB7q6LrXUuAs2S9V4tOPXqTstUv7g7eToQhPC6o922RQIfw6skgfrVl/D5JL/QCh49R4UhsuOUkN/4AQ26cY/hPEqrwWR2VG7qSkf+91rncNm68eSoPBB5eOR/vVD5rgA==","sunlu-pla-plus-weiss":"/qGYA/wUwoNQbr5NdLt0tJn126kxQq7BCAfFB/qqqq/gCj5tAJ/VFzy5jdU7zoCO9teLiBHzE/Urmqkw0FDS3GC4JOPz/Cgw92z6ynfSOqHQMYgfyrRGOhsTNJkUu40KfFZ1qZhSLZ4UbSUKNCR+RnNfngSIgZjHMsfAF6cKhWYdWSixtf6AWa8UW/qN5qowUXKbE7rYrR+d1xB58W6LiUMrBIbCIf/uyYiwgA==","sunlu-pla-plus-rot":"/twbA/wVNo9QbrUtVLt0U5v126kJQq7BK8XFB/qqqq/gCX5tAJ+2F7y8CdUnzobqdveLKI3yE/VsGrkwrPHS3GN4POPz4r9w92zC0HdSPEEwMYgVwrRGOotXNpkbsK0afFLkqZhTqlYUbSyb9CR+okFfngep8ZjHNcXAN6dAHWcdSaZRtf+AUK8UW/pl5qowULKbE7qCrR+d1ZB58W6PCUMrBArCIf/siYiwgA==","sunlu-petg-matt-orange":"/l9BQ/wQ7mDQbqjJort1eIWl26o9lK7BYKVZB/qqqq/gEC2nAL4Tg/Pk4JlKSY2VZLyv6KZ/OxawFw/rrGxe5IKLzqrXf5FB9HAiMDp+qS7eCGu41oKfVlL5DnqYvAQ/7kSdboQjH/84f2aSDMfwVvuE87QsiWtJKpLkhe8oCnhsibl1N/+Ac0ycY/kGiqrwUNERG7qcP/+91dwNNm62GyoPBLFMGR/oxC5rgA==","sunlu-petg-matt-blau":"/iZDQ/wSvmDQbrNport1UYWl26wV1K7BQedZB/qqqq/gGl3nAL5dhfPi7klKSYXKZLyv0sJ8OxPg9x/r7LNc5ICsLqrXcjRBNHCWnj7+qMIOCGuEwQK/VrqtD3qQOcQv7koGboQhn9cwf24IzMfw84mE87UHaXtJKM7khe96cnhsmXCVN/+AQUycY/hGiqrwUZERG7rWP/+91UwNNm6tGyoPBHVMGR/tpC5rgA==","sunlu-pla-plus-schwarz":"/mRBa/wQJmDQbqqpxrt1eoWF26490K7BU6ZJB/qqqq/gGG3jAL4Rg3Pk6ZlaCYnXZL6vq7Z9KxagFx/rrGxe5ICLRqLXb5EBsHA+2jr2qgOOGWu4koKdVhHpD3qavQQu7kS/bIQiH+8g/3eaTIfwnruE87WlmWtJItTkhe9LOntsibl1J/+Ac0ycY/kWiyrwUBEVG7qQP1+91RwINm60GwoPBLFMGR/oxD5rgA==","sunlu-pla-plus-klein-blau":"/hxpa/wRQqDQbrVPprt19qeF26oJkK7BRJVJB/qqqq/gH9GjAL5iKfPiZVwKCbjRAp6uUEFMKxY8hg/rlBx85IF7xzrXd7ON8HBLvpL2qIr7SWuEt2S9V8hePHqTo9U+7g7+ToQhPb6g/3QRgIfw+iEi87flPCtJJ/QChe8RwVtsuPUkN/4AYWycY/hfGyrwVR2VG7qQm9+91unINm68ewoPBA5MGR/vVD5rgA==","bambu-lab-pla-matt-grau":"/rayA/wTj4RQbq85XLt0YO6l26V8Zi7BUEcBB/qqqq/gAaVxAKNE8JkqbOU6m8rGtGeiuHMFL4i1y7kwuKvsraTqFE95vhZpInkjEEkbH+5ibPnGmlJkOtEsdUwOqZiZNTKk3M0GuZXdyb6qpFW5o3nxPwGFRR7beaW0XsJg+wBYPL1pkPyAXvz0R/scdyowRzlHErpeTp+N0MBspC6vy9FjBHw1HY/ueIi0gA==","sunlu-abs-hs-schwarz":"/iVDS/wStmTQbrVp5rt1c4WF26hVlK7BYORJB/qqqq/gEt2jAL51hXPj4hlLCYmsZJ6vkPJ9CxPx9w/r7LNcxIGNtqtXajTBNHCaWj7eqGJeCGuAgQKdVtqNDkqQKMQv7g4kbqQhvk8w/2cEjMfwJweEc7UH6XtJKI7kp+97cnlsmWCVN/+AYUycY/lGiyrwWdEVG7raP/+91RwINm6pGwoPBGVPOR/spC5rgA==","bambu-lab-pla-basic-beige":"/hZp6/wRiqDQbrVv5rt19KWF264JkK7BVJdJB/qqqq/gE9HjAL4kK/Pi4QwKCbDVApzOc2FNCxQthh/rlBx+5IF6XyLPZzuNsDCLNJL2qaMrSGuI1WSfV8peP2iTo9Uv7gr+ToQjDLa4f20RQMfwqkMiUrbh/CpJL5ACha9R8Vl8uvQkJv4AQWy8Y/nfEqrwVd3VG7rWk/+912nINm68eyoPBD5/OR/uVC5vgA==","bambu-lab-pla-matt-marineblau":"/sfFG/wQloNQbo3xZLt1SUCV26xoV67BZolxB/qqqq/gHb2SAIvuP4fJxPUth53GuF9B0fibF2Y3lsj3lIHw3GCsTLz3lIaRgfeyr44HbiUjO+WRothc2Iov63ThIEXo8jg3wLzDKi0uR4SVnPY3BuI+I3ZolAnHCYY6ZiBxYJ5gzb5V4fsAeeKEQ/uEnKoQQoGlHLrrj4/90kEruG6LwemBBDe7JW/sBPlzgA=="};
 const colors = {Schwarz:'#131313',Weiß:'#fff',Rot:'#d23936',Grün:'#38a55a',Orange:'#f88733',Blau:'#355fe6','Klein-Blau':'#1729ab',Grau:'#9b9ea0',Beige:'#f7e6de',Marineblau:'#0078bf',Gelb:'#f4d542',Rosa:'#e884ae',Lila:'#8d58c8',Türkis:'#23a99e',Braun:'#87583e',Silber:'#b9c3cc',Gold:'#d6ad4a'};
 const dryingByDevice = {
@@ -862,6 +874,7 @@ for (const card of cards.querySelectorAll('article[id]')) {
     address.hidden = true;
     address.setAttribute('aria-label','Link zur Filamentkarte');
     address.value = directLink.href;
+    directLink.href = '#bestand/'+card.id;
     share.onclick = async () => {
       try {
         if (navigator.share) {
@@ -1414,18 +1427,43 @@ function normalizeSearch(value) {
   return value.toLocaleLowerCase('de').normalize('NFD').replace(/\p{M}/gu,'').replaceAll('ß','ss').replace(/[^\p{L}\p{N}+]+/gu,' ').trim();
 }
 let previousRoute = null;
+let editReturnRoute = '';
+const scrollPositions = new Map();
+const listRoutes = new Set(['filament-bestand','bestand-lagerort','trocknung']);
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+function rememberListPosition() {
+  if (listRoutes.has(previousRoute) && location.hash.slice(1)===previousRoute) {
+    scrollPositions.set(previousRoute,window.scrollY);
+  }
+}
+window.addEventListener('scroll',rememberListPosition,{passive:true});
+document.addEventListener('click',event=>{
+  if (event.target.closest?.('a[href^="#"]')) rememberListPosition();
+},true);
 function filter() {
   const route = location.hash.slice(1);
-  const stockPrefix = 'lagerbestand/';
+  const contexts = [
+    ['lagerbestand/','bestand-lagerort'],
+    ['bestand/','filament-bestand'],
+    ['trocknung/','trocknung']
+  ];
+  const context = contexts.find(([prefix])=>route.startsWith(prefix));
+  const id = context ? route.slice(context[0].length) : route;
   const shared = sharedCardFor(route);
-  const missingLocalCard = /^eigene-rolle-[a-f0-9-]{36}$/i.test(route) && !document.getElementById(route);
+  const missingLocalCard = /^eigene-rolle-[a-f0-9-]{36}$/i.test(id) && !document.getElementById(id);
   document.querySelector('#missing-local-card').hidden = !missingLocalCard;
-  const target = shared ?? document.getElementById(route.startsWith(stockPrefix) ? route.slice(stockPrefix.length) : route);
+  const target = shared ?? document.getElementById(id);
   const single = target?.parentElement === cards;
-  const stockDetail = single && route.startsWith(stockPrefix);
+  const stockDetail = single && context?.[1]==='bestand-lagerort';
   cards.classList.toggle('stock-detail',stockDetail);
-  back.href = stockDetail ? '#bestand-lagerort' : single ? '#filament-bestand' : './';
-  back.textContent = stockDetail ? '← Bestand Lagerort' : single ? '← Alle Rollen' : '← Hauptmenü';
+  const returnPage = single ? context?.[1] : null;
+  if (returnPage) {
+    back.href = '#'+returnPage;
+    back.textContent = '← '+pageTitles[returnPage];
+  } else if (route==='filament-anlegen' && editing && editReturnRoute) {
+    back.href = '#'+editReturnRoute;
+    back.textContent = '← Filamentkarte';
+  }
   if (stockDetail && route!==previousRoute) target.querySelector('.locations').open = true;
   previousRoute = route;
   const locationsView = target === locationOverview;
@@ -1440,7 +1478,21 @@ function filter() {
   if (printersView) renderPrinters();
   menu.hidden = !home;
   overview.hidden = !inventoryView;
-  back.hidden = home;
+  const heading = single ? target.querySelector('h2') : null;
+  const title = heading ? [heading.textContent,target.dataset.color ?? target.querySelector('.label')?.textContent].filter(Boolean).join(' · ')
+    : missingLocalCard ? 'Filamentkarte' : createView && editing ? 'Filament bearbeiten' : pageTitles[route] ?? 'Hauptmenü';
+  if (pageNavigation) pageNavigation.hidden = home;
+  pageTitle.hidden = Boolean(heading);
+  pageTitle.parentElement.hidden = Boolean(heading);
+  if (!heading) pageTitle.textContent = title;
+  homeIntro.hidden = !home;
+  document.title = title+' · Filamentlager';
+  back.hidden = !(returnPage || (createView && editing && editReturnRoute));
+  if (!pageNavigation && !home && back.hidden) {
+    back.href = '#';
+    back.textContent = '← Hauptmenü';
+    back.hidden = false;
+  }
   cards.hidden = !single && !inventoryView;
   locationOverview.hidden = !locationsView;
   filamentEditor.hidden = !createView;
@@ -1452,7 +1504,19 @@ function filter() {
   if (locationsView) renderLocationOverview();
   const terms = normalizeSearch(search.value).split(' ').filter(Boolean);
   for (const card of cards.children) {
-    const name = card.querySelector('h2')?.textContent ?? '';
+    const cardTitle = card.querySelector('h2');
+    const isActive = single && card===target;
+    if (isActive) {
+      cardTitle.setAttribute('aria-level','1');
+      cardTitle.setAttribute('aria-label',title);
+    } else {
+      cardTitle?.removeAttribute('aria-level');
+      cardTitle?.removeAttribute('aria-label');
+    }
+    cardTitle?.classList.toggle('card-page-title',isActive);
+    const openCard = card.querySelector('.open-roll');
+    if (openCard) openCard.hidden = single;
+    const name = cardTitle?.textContent ?? '';
     const searchable = normalizeSearch([name,card.dataset.material,card.dataset.color].join(' '));
     const matches = terms.every(term=>searchable.includes(term));
     card.hidden = single ? card !== target : !matches || (availableOnly.checked && card.dataset.stockCount === '0') || (materialFilter.value && card.dataset.material !== materialFilter.value) || (colorFilter.value && card.dataset.colorFamily !== colorFilter.value);
@@ -1460,7 +1524,13 @@ function filter() {
   document.querySelector('#empty').hidden = !inventoryView || [...cards.children].some(card => !card.hidden);
 }
 materialFilter.onchange = colorFilter.onchange = availableOnly.onchange = filter;
-window.addEventListener('hashchange', () => { filter(); window.scrollTo(0,0); });
+window.addEventListener('hashchange', () => {
+  const route = location.hash.slice(1);
+  filter();
+  requestAnimationFrame(()=>{
+    if (location.hash.slice(1)===route) window.scrollTo(0,scrollPositions.get(route) ?? 0);
+  });
+});
 function updateLocalCardColor(card,roll) {
   card.dataset.color = roll.farbe;
   card.dataset.colorFamily = colorFamily(roll.farbe,roll.farbfamilie);
@@ -1491,6 +1561,7 @@ function render() {
     }
     const edit = element('button','Bearbeiten');
     edit.onclick = () => {
+      editReturnRoute = location.hash.slice(1) === 'filament-bestand' ? 'bestand/'+card.id : location.hash.slice(1);
       editing = roll.id;
       const current = rolls.find(item=>item.id===editing);
       for (const field of form.querySelectorAll('[name]')) field.value = current?.[field.name] ?? '';
@@ -1503,7 +1574,10 @@ function render() {
       updateCardSave();
       form.elements.material.focus();
     };
-    card.append(label,element('h2',roll.material),ownManufacturer(specs,roll.produktseite),edit);
+    const openCard = element('a','Filamentkarte öffnen');
+    openCard.className = 'open-roll';
+    openCard.href = '#bestand/'+card.id;
+    card.append(label,element('h2',roll.material),ownManufacturer(specs,roll.produktseite),edit,openCard);
     prepareCard(card,roll.farbe,roll);
     addLocalQr(card,roll,true);
     addLocalQr(card,roll);
@@ -1613,6 +1687,7 @@ function saveSelectedColor(name) {
 }
 function clearEditor() {
   editing = null;
+  editReturnRoute = '';
   form.reset();
   colorInput.value = readColorDraft();
   colorPicker.open = false;
@@ -1620,7 +1695,13 @@ function clearEditor() {
   reset.hidden = true;
   updateCardSave();
 }
-reset.onclick = () => { clearEditor(); status.textContent = ''; };
+reset.onclick = () => {
+  const returnRoute = editReturnRoute;
+  clearEditor();
+  status.textContent = '';
+  if (returnRoute) location.hash = returnRoute;
+  else filter();
+};
 form.onsubmit = event => {
   event.preventDefault();
   if (cardSave.disabled) return;
@@ -1644,6 +1725,7 @@ form.onsubmit = event => {
     status.replaceChildren('Für dieses Filament gibt es bereits eine Karte. ',show);
     return;
   }
+  const returnRoute = editing ? editReturnRoute : '';
   const roll = {...fields,id:editing ?? crypto.randomUUID()};
   const next = editing ? rolls.map(item => item.id === editing ? roll : item) : [...rolls,roll];
   try { localStorage.setItem(key,JSON.stringify(next)); } catch { status.textContent = 'Speichern in diesem Browser fehlgeschlagen.'; return; }
@@ -1654,7 +1736,7 @@ form.onsubmit = event => {
   clearEditor();
   search.value = '';
   render();
-  location.hash = 'eigene-rolle-' + roll.id;
+  location.hash = returnRoute || 'bestand/eigene-rolle-' + roll.id;
   status.textContent = 'Gespeichert';
 };
 
@@ -2087,7 +2169,7 @@ function renderDryingDashboard() {
     view.className = 'drying-dashboard-card';
     const heading = element('h3','');
     const link = element('a',title);
-    link.href = '#'+card.id;
+    link.href = '#trocknung/'+card.id;
     heading.append(link);
     const signal = element('span',dryingStates[state].label);
     signal.className = 'drying-state';
