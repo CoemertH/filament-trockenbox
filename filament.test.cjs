@@ -19,6 +19,7 @@ const scope = vm.createContext({
   key:'filament-trockenbox-rolls',
   locationKey:'filament-lagerorte',
   locationOrderKey:'filament-lagerorte-reihenfolge',
+  dryingIntervalKey:'filament-trocknungsintervalle',
   printerKey:'filament-drucker',
   nozzleVariantKey:'filament-duesenvarianten',
   localStorage:{getItem:key=>stored.get(key) ?? null},
@@ -30,6 +31,7 @@ const scope = vm.createContext({
 scope.localStorage.setItem = (key,value)=>stored.set(key,value);
 new vm.Script(app);
 vm.runInContext(read('filament-stock.js'),scope);
+vm.runInContext(section('const dryingStates','function renderDryingDashboard'),scope);
 vm.runInContext(section('const backupPrefixes','document.querySelector(\'#backup-export\')'),scope);
 vm.runInContext(section('function saveSelectedColor','function clearEditor'),scope);
 vm.runInContext(section('const materialTypes','function makeSwatch'),scope);
@@ -60,10 +62,11 @@ test('Sicherung akzeptiert Altbestand und neue Lagerreihenfolge und Trocknung',(
   const records={
     [scope.locationKey]:JSON.stringify([{id:'regal',name:'Regal'},{id:'schrank',name:'Schrank'}]),
     [scope.locationOrderKey]:'["schrank","regal"]',
+    [scope.dryingIntervalKey]:'{"support-pla-petg-schwarz":14}',
     [stockKey]:JSON.stringify([{...old,drying:[drying]}])
   };
   assert.equal(scope.validateBackup({version:1,records}),records);
-  assert.equal(scope.backupPlan(records).length,4);
+  assert.equal(scope.backupPlan(records).length,5);
   assert.doesNotThrow(()=>scope.validateBackup({version:1,records:{[stockKey]:JSON.stringify([old])}}));
   assert.throws(()=>scope.validateBackup({version:1,records:{[scope.locationOrderKey]:'["regal","regal"]'}}));
   assert.equal(scope.validDryingSession({...drying,date:'2026-02-30'}),false);
@@ -89,4 +92,15 @@ test('Alle eingebetteten QR-Ziele besitzen weiterhin eine Karte',()=>{
     assert.ok(html.includes('<article id="'+id+'"'));
     assert.ok(html.includes('href="#'+id+'"'));
   }
+});
+
+test('Trocknungsampel unterscheidet alle Fristen und manuelle Markierungen',()=>{
+  const today=new Date(2026,10,8,12);
+  const roll={drying:[{date:'2026-11-01',device:'Trockenbox',temperature:55,hours:8}]};
+  assert.equal(scope.dryingSchedule(roll,7,today).state,'due');
+  assert.equal(scope.dryingSchedule(roll,10,today).state,'soon');
+  assert.equal(scope.dryingSchedule(roll,11,today).state,'planned');
+  assert.equal(scope.dryingSchedule(roll,null,today).state,'open');
+  assert.equal(scope.dryingSchedule({dryingDue:true},null,today).state,'due');
+  assert.equal(scope.dryingSchedule({},7,today).state,'open');
 });
