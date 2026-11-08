@@ -32,6 +32,11 @@
 .capture-batch legend{padding:0 .35rem}
 .capture-extra{margin-top:.8rem}
 .capture-extra summary{margin-bottom:.5rem}
+.scan-result-actions{display:flex;gap:.65rem;flex-wrap:wrap;align-items:center}
+.scan-result-actions button{margin:0}
+.scan-rolls{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr));gap:.5rem}
+.scan-rolls article{padding:.65rem;margin:0}
+.scan-rolls p{margin:.35rem 0}
 </style>
 <main>
 <nav id="page-navigation" aria-label="Seitennavigation" hidden>
@@ -43,7 +48,7 @@
   <a id="menu-filaments" href="#filament-bestand">Filamentbestand</a>
   <a id="menu-locations" href="#bestand-lagerort">Bestand nach Lagerort</a>
   <a id="new-filament" href="#filament-anlegen">Filament erfassen</a>
-  <a id="menu-scan" href="#filament-scannen">Filament scannen</a>
+  <a id="menu-scan" href="#filament-scannen">QR-Schnellscan</a>
   <a href="#meine-drucker">Meine Drucker</a>
   <a href="#trocknung">Trocknung</a>
   <a href="#datensicherung">Datensicherung</a>
@@ -307,5 +312,5 @@
     <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
 </template>
 <script src="./filament-stock.js"></script>
-<script src="./filament-app.js?v=6"></script>
+<script src="./filament-app.js?v=7"></script>
 </html>
