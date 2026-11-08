@@ -30,6 +30,7 @@ article:target > .open-roll{display:none}
   <a id="menu-locations" href="#bestand-lagerort">Bestand Lagerort</a>
   <a id="new-filament" href="#filament-anlegen">Neues Filament anlegen</a>
   <a id="menu-scan" href="#filament-scannen">Filament scannen</a>
+  <a href="#meine-drucker">Meine Drucker</a>
 </nav>
 <section id="bestand-lagerort" aria-labelledby="location-stock-title" hidden>
   <h2 id="location-stock-title">Bestand Lagerort</h2>
@@ -38,6 +39,20 @@ article:target > .open-roll{display:none}
 </section>
 <details id="filament-editor" hidden><summary hidden>Filamentdaten</summary>
 <form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Material<input name="material" required maxlength="100"></label><label>Farbe<input name="farbe" required maxlength="60"></label><label>Durchmesser<input name="durchmesser" placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" placeholder="500 g"></label><label>Drucktemperatur<input name="druck" placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" placeholder="70 °C · 8 Stunden"></label><label>Produktseite beim Hersteller (optional)<input name="produktseite" type="url" placeholder="https://…"></label></div><button id="card-save">Filamentkarte speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
+<section id="meine-drucker" aria-labelledby="printer-title" hidden>
+  <h2 id="printer-title">Meine Drucker</h2>
+  <div id="printer-list"></div>
+  <button id="printer-add" type="button" aria-expanded="false" aria-controls="printer-form">Drucker hinzufügen</button>
+  <form id="printer-form" hidden>
+    <div class="fields">
+      <label>Druckermodell oder Name<input name="name" required maxlength="80" placeholder="z. B. Bambu Lab A1"></label>
+      <label>Anzahl der Düsen<select name="count"></select></label>
+    </div>
+    <div id="printer-nozzles" class="fields"></div>
+    <button>Drucker speichern</button>
+  </form>
+  <p id="printer-status" role="status"></p>
+</section>
 <section id="scan-view" aria-labelledby="scan-title" hidden>
 <h2 id="scan-title">Filament scannen</h2>
 <button id="scan-open" type="button" aria-expanded="false" aria-controls="filament-scanner">Scanner öffnen</button>
@@ -238,7 +253,7 @@ article:target > .open-roll{display:none}
 <p id="empty" hidden>Keine passende Rolle gefunden.</p>
 
 <details id="backup" hidden><summary>Datensicherung</summary>
-<p>Sichere eigene Filamentkarten, X2D-Druckwerte, Bestände und Leergewichte. Die Datei kannst du auch in einem anderen Browser importieren.</p>
+<p>Sichere eigene Filamentkarten, Druckerprofile, Bestände und Leergewichte. Die Datei kannst du auch in einem anderen Browser importieren.</p>
 <button id="backup-export" type="button">Sicherung exportieren</button>
 <label>Sicherung auswählen<input id="backup-file" type="file" accept=".json,application/json"></label>
 <p id="backup-status" role="status"></p>
@@ -246,7 +261,7 @@ article:target > .open-roll{display:none}
 <label>Bei Konflikten<select id="backup-conflict"><option value="keep">Vorhandene Daten behalten</option><option value="replace">Werte aus der Sicherung übernehmen</option></select></label>
 <button id="backup-import" type="button">Sicherung importieren</button>
 </div></details>
-<footer>Filamentlager · Bambu Lab X2D</footer>
+<footer>Filamentlager</footer>
 </main>
 <template id="specs-sunlu-pla-plus">
     <div><dt>Durchmesser</dt><dd>1,75 mm</dd></div>
@@ -724,6 +739,19 @@ function addStockSection(card, profile) {
   profile.after(location.details,section);
   renderStock(readStock());
 }
+const printerKey = 'filament-drucker';
+const x2d = {id:'x2d',name:'Bambu Lab X2D',diameters:['0,4','0,4']};
+function readPrinters() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(printerKey));
+    if (Array.isArray(saved)) return [x2d,...saved];
+  } catch {}
+  return [x2d];
+}
+function nozzleName(printer,index) {
+  if (printer.id==='x2d') return index===0 ? 'Hauptdüse' : 'Nebendüse';
+  return printer.diameters.length===1 ? 'Düse' : 'Düse '+(index+1);
+}
 function prepareCard(card, color) {
   const title = card.querySelector('h2').textContent;
   card.dataset.material = title.match(/Stützmaterial|PLA\+|PETG|ABS|PLA/i)?.[0] ?? title;
@@ -744,24 +772,44 @@ function prepareCard(card, color) {
   if (Object.hasOwn(colors,color)) cardHeading.append(swatch);
   cardHeading.append(text);
   const profile = element('details','');
-  profile.append(element('summary','Eigene Druckwerte für den X2D'));
+  profile.append(element('summary','Eigene Druckwerte'));
   const editor = element('form','');
   editor.append(element('p','Diese Werte werden in diesem Browser gespeichert.'));
   const fields = element('div','');
   fields.className = 'fields';
-  const profileKey = 'filament-x2d:' + card.id;
+  const printerLabel = element('label','Drucker');
+  const printerSelect = element('select','');
+  printerLabel.append(printerSelect);
   const nozzleLabel = element('label','Düse');
   const nozzle = element('select','');
-  nozzle.append(new Option('Hauptdüse','main'),new Option('Nebendüse','secondary'));
   nozzleLabel.append(nozzle);
-  editor.append(nozzleLabel);
-  const profileKeys = {main:profileKey,secondary:profileKey + ':secondary'};
-  const drafts = {};
-  let activeNozzle = 'main';
+  const choice = element('div','');
+  choice.className = 'fields';
+  choice.append(printerLabel,nozzleLabel);
+  editor.append(choice);
+  const drafts = new Map();
+  let activePrinter = x2d;
+  let activeNozzle = 0;
+  function refreshPrinterOptions() {
+    printerSelect.replaceChildren(...readPrinters().map(printer=>new Option(printer.name,printer.id)));
+    printerSelect.value = activePrinter.id;
+  }
+  function refreshNozzleOptions() {
+    nozzle.replaceChildren(...activePrinter.diameters.map((diameter,index)=>new Option(nozzleName(activePrinter,index)+(diameter?' · '+diameter+' mm':''),String(index))));
+    nozzle.value = String(activeNozzle);
+    nozzleLabel.hidden = activePrinter.diameters.length===1;
+  }
+  function profileStorageKey() {
+    if (activePrinter.id==='x2d') return 'filament-x2d:'+card.id+(activeNozzle===1?':secondary':'');
+    return 'filament-druckprofil:'+activePrinter.id+':'+activeNozzle+':'+card.id;
+  }
   function readProfile() {
-    try { return JSON.parse(localStorage.getItem(profileKeys[activeNozzle])) ?? {}; }
+    try { return JSON.parse(localStorage.getItem(profileStorageKey())) ?? {}; }
     catch { return {}; }
   }
+  refreshPrinterOptions();
+  refreshNozzleOptions();
+  card.addEventListener('printers-changed',refreshPrinterOptions);
   const saved = readProfile();
   for (const [name,label] of Object.entries({duese:'Düsentemperatur (°C)',platte:'Druckplatte',bett:'Druckbett (°C)',fluss:'Maximaler Volumenstrom (mm³/s)',kWert:'K-Wert',flussverhaeltnis:'Flussverhältnis',notiz:'Notizen'})) {
     const field = element('label',label);
@@ -802,20 +850,24 @@ function prepareCard(card, color) {
   editor.addEventListener('keydown',event => {
     if (event.key==='Enter' && event.target instanceof HTMLInputElement) event.preventDefault();
   });
-  nozzle.onchange = () => {
-    drafts[activeNozzle] = Object.fromEntries(new FormData(editor));
-    activeNozzle = nozzle.value;
+  function switchProfile(printer,index) {
+    drafts.set(profileStorageKey(),Object.fromEntries(new FormData(editor)));
+    activePrinter = printer;
+    activeNozzle = index;
+    refreshNozzleOptions();
     baseline = readProfile();
-    const values = drafts[activeNozzle] ?? baseline;
+    const values = drafts.get(profileStorageKey()) ?? baseline;
     for (const input of inputs) input.value = values[input.name] ?? '';
     onProfileEdit();
-  };
+  }
+  printerSelect.onchange = () => switchProfile(readPrinters().find(printer=>printer.id===printerSelect.value) ?? x2d,0);
+  nozzle.onchange = () => switchProfile(activePrinter,Number(nozzle.value));
   editor.onsubmit = event => {
     event.preventDefault();
     if (save.disabled) return;
     const values = Object.fromEntries(new FormData(editor));
     try {
-      localStorage.setItem(profileKeys[activeNozzle],JSON.stringify(values));
+      localStorage.setItem(profileStorageKey(),JSON.stringify(values));
       baseline = values;
       updateSaveButton();
       message.textContent = 'Gespeichert';
@@ -1284,7 +1336,10 @@ function filter() {
   const inventoryView = route==='filament-bestand';
   const createView = route==='filament-anlegen';
   const scanningView = route==='filament-scannen';
-  const home = !single && !locationsView && !inventoryView && !createView && !scanningView;
+  const printersView = route==='meine-drucker';
+  const home = !single && !locationsView && !inventoryView && !createView && !scanningView && !printersView;
+  printerView.hidden = !printersView;
+  if (printersView) renderPrinters();
   menu.hidden = !home;
   overview.hidden = !inventoryView;
   back.hidden = home;
@@ -1401,7 +1456,9 @@ let incomingBackup = null;
 const backupPrefixes = ['filament-x2d:','filament-bestand:','filament-spulengewicht:'];
 const localCardPattern = /^eigene-rolle-[a-f0-9-]{36}$/i;
 function personalKey(name) {
-  if (name === key || name === locationKey) return true;
+  if (name === key || name === locationKey || name === printerKey) return true;
+  const printerProfile = name.match(/^filament-druckprofil:[a-f0-9-]{36}:[0-7]:(.+)$/i);
+  if (printerProfile) return personalKey('filament-x2d:'+printerProfile[1]);
   const prefix = backupPrefixes.find(value=>name.startsWith(value));
   if (!prefix) return false;
   const cardId = name.slice(prefix.length).replace(prefix==='filament-x2d:' ? /:secondary$/ : /$/,'');
@@ -1415,7 +1472,9 @@ function validateBackup(data) {
     if (!personalKey(name) || !isText(raw)) throw Error();
     if (name.startsWith('filament-spulengewicht:')) { if (!decimal(raw)) throw Error(); continue; }
     const value = JSON.parse(raw);
-    if (name===locationKey) {
+    if (name===printerKey) {
+      if (!Array.isArray(value) || value.some(item=>!item || !/^[a-f0-9-]{36}$/i.test(item.id) || !isText(item.name) || !item.name.trim() || item.name.length>80 || !Array.isArray(item.diameters) || item.diameters.length<1 || item.diameters.length>8 || item.diameters.some(value=>!validNozzle(value))) || new Set(value.map(item=>item.id)).size!==value.length) throw Error();
+    } else if (name===locationKey) {
       if (!Array.isArray(value) || value.some(item=>!item || !isText(item.id) || !isText(item.name) || !item.name.trim() || item.name.length>60) || new Set(value.map(item=>item.id)).size!==value.length) throw Error();
     } else if (name===key) {
       if (!Array.isArray(value) || value.some(item=>!item || !localCardPattern.test('eigene-rolle-'+item.id) || !isText(item.material) || !item.material.trim() || !isText(item.farbe) || !item.farbe.trim() || Object.values(item).some(field=>!isText(field)))) throw Error();
@@ -1431,7 +1490,7 @@ function backupPlan(records) {
   const changes = [];
   for (const [name,value] of Object.entries(records)) {
     const before = localStorage.getItem(name);
-    if (name!==key && name!==locationKey) {
+    if (name!==key && name!==locationKey && name!==printerKey) {
       if (before!==value) changes.push({name,before,value,conflict:before!==null});
       continue;
     }
@@ -1479,8 +1538,8 @@ document.querySelector('#backup-import').onclick = () => {
   const written = [];
   try {
     const plan = backupPlan(incomingBackup).filter(item=>!item.conflict || backupConflict.value==='replace');
-    const writes = plan.filter(item=>item.name!==key && item.name!==locationKey);
-    for (const name of [key,locationKey]) {
+    const writes = plan.filter(item=>item.name!==key && item.name!==locationKey && item.name!==printerKey);
+    for (const name of [key,locationKey,printerKey]) {
       const importedItems = plan.filter(item=>item.name===name);
       if (!importedItems.length) continue;
       const before = localStorage.getItem(name);
@@ -1627,6 +1686,69 @@ document.querySelector('#menu-scan').onclick = event => {
 document.querySelector('#scan-close').onclick = () => { closeScanner(); scanOpen.focus(); };
 window.addEventListener('hashchange',closeScanner);
 window.addEventListener('pagehide',closeScanner);
+
+const printerView = document.querySelector('#meine-drucker');
+const printerList = document.querySelector('#printer-list');
+const printerAdd = document.querySelector('#printer-add');
+const printerForm = document.querySelector('#printer-form');
+const printerStatus = document.querySelector('#printer-status');
+const nozzleFields = document.querySelector('#printer-nozzles');
+const countSelect = printerForm.elements.count;
+for (let count=1;count<=8;count++) countSelect.add(new Option(String(count),String(count)));
+function renderPrinters() {
+  printerList.replaceChildren();
+  for (const printer of readPrinters()) {
+    const entry = element('article','');
+    entry.append(element('h3',printer.name));
+    const list = element('ul','');
+    printer.diameters.forEach((diameter,index)=>list.append(element('li',nozzleName(printer,index)+(diameter?' · '+diameter+' mm':''))));
+    entry.append(list);
+    printerList.append(entry);
+  }
+}
+function renderNozzleFields() {
+  const old = [...nozzleFields.querySelectorAll('input')].map(input=>input.value);
+  nozzleFields.replaceChildren();
+  for (let index=0;index<Number(countSelect.value);index++) {
+    const label = element('label','Durchmesser Düse '+(index+1)+' in mm (optional)');
+    const input = element('input','');
+    input.inputMode = 'decimal';
+    input.maxLength = 8;
+    input.placeholder = '0,4';
+    input.value = old[index] ?? '';
+    label.append(input);
+    nozzleFields.append(label);
+  }
+}
+countSelect.onchange = renderNozzleFields;
+printerAdd.onclick = () => {
+  printerForm.hidden = !printerForm.hidden;
+  printerAdd.setAttribute('aria-expanded',String(!printerForm.hidden));
+  if (!printerForm.hidden) printerForm.elements.name.focus();
+};
+function validNozzle(value) {
+  return typeof value==='string' && (value==='' || (/^\d+(?:[,.]\d+)?$/.test(value) && value.length<=8 && Number(value.replace(',','.'))>0));
+}
+printerForm.onsubmit = event => {
+  event.preventDefault();
+  const name = printerForm.elements.name.value.trim();
+  const diameters = [...nozzleFields.querySelectorAll('input')].map(input=>input.value.trim());
+  if (!name || diameters.some(value=>!validNozzle(value))) { printerStatus.textContent = 'Gib einen Druckernamen und gültige Düsendurchmesser ein.'; return; }
+  const printers = readPrinters();
+  if (printers.some(printer=>printer.name.toLocaleLowerCase('de')===name.toLocaleLowerCase('de'))) { printerStatus.textContent = 'Diesen Druckernamen gibt es bereits.'; return; }
+  const added = {id:crypto.randomUUID(),name,diameters:diameters.map(value=>value.replace('.',','))};
+  try { localStorage.setItem(printerKey,JSON.stringify([...printers.filter(printer=>printer.id!=='x2d'),added])); }
+  catch { printerStatus.textContent = 'Der Drucker konnte nicht gespeichert werden.'; return; }
+  for (const card of cards.children) card.dispatchEvent(new Event('printers-changed'));
+  printerForm.reset();
+  nozzleFields.replaceChildren();
+  renderNozzleFields();
+  printerForm.hidden = true;
+  printerAdd.setAttribute('aria-expanded','false');
+  renderPrinters();
+  printerStatus.textContent = 'Drucker gespeichert.';
+};
+renderNozzleFields();
 
 search.oninput = filter;
 render();
