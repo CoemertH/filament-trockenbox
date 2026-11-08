@@ -37,7 +37,7 @@ article:target > .open-roll{display:none}
   <div id="location-stock-groups"></div>
 </section>
 <details id="filament-editor" hidden><summary hidden>Filamentdaten</summary>
-<form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Material<input name="material" required maxlength="100"></label><label>Farbe<input name="farbe" required maxlength="60"></label><label>Durchmesser<input name="durchmesser" placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" placeholder="500 g"></label><label>Drucktemperatur<input name="druck" placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" placeholder="70 °C · 8 Stunden"></label></div><button id="card-save">Filamentkarte speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
+<form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Material<input name="material" required maxlength="100"></label><label>Farbe<input name="farbe" required maxlength="60"></label><label>Durchmesser<input name="durchmesser" placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" placeholder="500 g"></label><label>Drucktemperatur<input name="druck" placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" placeholder="70 °C · 8 Stunden"></label><label>Produktseite beim Hersteller (optional)<input name="produktseite" type="url" placeholder="https://…"></label></div><button id="card-save">Filamentkarte speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
 <section id="scan-view" aria-labelledby="scan-title" hidden>
 <h2 id="scan-title">Filament scannen</h2>
 <button id="scan-open" type="button" aria-expanded="false" aria-controls="filament-scanner">Scanner öffnen</button>
@@ -858,7 +858,7 @@ for (const card of cards.querySelectorAll('article[id]')) {
   const manufacturer = element('details','');
   manufacturer.append(element('summary','Herstellerangaben'));
   specs.before(manufacturer);
-  manufacturer.append(specs,...card.querySelectorAll(':scope > p:not(.product-link)'));
+  manufacturer.append(specs,...card.querySelectorAll(':scope > p'));
   const drying = [...specs.children].filter(field=>field.querySelector('dt').textContent.startsWith('Trocknung'));
   if (qrCodes[card.id]) addQr(card,qrCodes[card.id]);
   const directLink = card.querySelector('.open-roll');
@@ -897,7 +897,7 @@ for (const card of cards.querySelectorAll('article[id]')) {
   const existingDrying = drying.map(field => field.querySelector('dd').textContent).join(' · ');
   const values = dryingByDevice[card.id] ?? [existingDrying + (card.id.startsWith('sunlu-pla-plus-') ? ' · Gerät nicht angegeben' : '')];
   const list = element('ul','');
-  const sources = [...manufacturer.querySelectorAll('a[href]')];
+  const sources = [...manufacturer.querySelectorAll('p:not(.product-link) a[href]')];
   for (const value of values) {
     const item = element('li',value);
     let source = sources[0];
@@ -1115,7 +1115,29 @@ function renderLocationOverview(message = '') {
   if (!groups.size) locationGroups.append(element('p','Derzeit sind keine Rollen im Bestand.'));
 }
 const sharedPrefix = 'filament/';
-const publicFields = ['material','farbe',...Object.keys(labels)];
+const publicFields = ['material','farbe',...Object.keys(labels),'produktseite'];
+function productPage(value) {
+  try {
+    const url = new URL(value);
+    return (url.protocol==='https:' || url.protocol==='http:') && !url.username && !url.password ? url.href : '';
+  } catch { return ''; }
+}
+function ownManufacturer(specs, value) {
+  const section = element('details','');
+  section.append(element('summary','Herstellerangaben'),specs);
+  const url = productPage(value);
+  if (url) {
+    const link = element('a','Produktseite beim Hersteller');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    const row = element('p','');
+    row.className = 'product-link';
+    row.append(link);
+    section.append(row);
+  }
+  return section;
+}
 let qrLibrary;
 function loadQrLibrary() {
   if (!qrLibrary) qrLibrary = new Promise((resolve,reject) => {
@@ -1226,7 +1248,7 @@ function sharedCardFor(route) {
     if (payload.length>32000 || !/^[A-Za-z0-9_-]+$/.test(payload)) throw Error();
     const bytes = Uint8Array.from(atob(payload.replaceAll('-','+').replaceAll('_','/')),char=>char.charCodeAt(0));
     const data = JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
-    if (!Array.isArray(data) || data.length!==publicFields.length || data.some(value=>typeof value!=='string') || !data[0].trim() || !data[1].trim()) throw Error();
+    if (!Array.isArray(data) || (data.length!==publicFields.length && data.length!==publicFields.length-1) || data.some(value=>typeof value!=='string') || !data[0].trim() || !data[1].trim()) throw Error();
     const roll = Object.fromEntries(publicFields.map((field,index)=>[field,data[index]]));
     const label = element('span',roll.farbe);
     label.className = 'label';
@@ -1237,7 +1259,7 @@ function sharedCardFor(route) {
       item.append(element('dt',title),element('dd',roll[field] || 'Nicht angegeben'));
       specs.append(item);
     }
-    card.append(specs);
+    card.append(ownManufacturer(specs,roll.produktseite));
   } catch { card.append(element('h2','Filamentlink ungültig'),element('p','Der Link ist unvollständig oder enthält ungültige Filamentdaten.')); }
   cards.append(card);
   return card;
@@ -1304,7 +1326,7 @@ function render() {
       updateCardSave();
       form.elements.material.focus();
     };
-    card.append(label,element('h2',roll.material),specs,edit);
+    card.append(label,element('h2',roll.material),ownManufacturer(specs,roll.produktseite),edit);
     prepareCard(card,roll.farbe);
     addLocalQr(card,roll);
     cards.append(card);
@@ -1336,6 +1358,7 @@ form.onsubmit = event => {
   if (cardSave.disabled) return;
   const fields = Object.fromEntries([...new FormData(form)].map(([field,value]) => [field,value.trim()]));
   if (!fields.material || !fields.farbe) { status.textContent = 'Bitte Material und Farbe eintragen.'; return; }
+  if (fields.produktseite && !productPage(fields.produktseite)) { status.textContent = 'Gib eine gültige Produktadresse mit https:// oder http:// ein.'; return; }
   const normalize = value => value.normalize('NFKC').trim().toLocaleLowerCase('de').replace(/\s+/g,' ');
   const duplicate = [...cards.children].find(card => card.id !== 'eigene-rolle-' + editing && normalize(card.querySelector('h2').textContent) === normalize(fields.material) && normalize(card.dataset.color) === normalize(fields.farbe));
   if (duplicate) {
