@@ -46,8 +46,7 @@ function createLocationManager(onChange, feedback, initiallyOpen = false) {
   manager.className = 'location-manager';
   function changed(message) {
     for (const card of cards.children) card.dispatchEvent(new Event('locations-changed'));
-    if (onChange) onChange(message);
-    else feedback.textContent = message;
+    onChange(message);
   }
   function renderManager() {
     const places = readLocations();
@@ -201,7 +200,7 @@ function createLocationManager(onChange, feedback, initiallyOpen = false) {
   }
   manage.onclick = () => setOpen(manager.hidden);
   setOpen(initiallyOpen);
-  return {manage,manager,refresh,setOpen};
+  return {manage,manager,setOpen};
 }
 function addLocationSection(card, readStock, saveStock) {
   const details = element('details','');
@@ -209,14 +208,10 @@ function addLocationSection(card, readStock, saveStock) {
   const summary = element('summary','');
   const panel = element('div','');
   panel.className = 'location-panel';
-  const layout = element('div','');
-  layout.className = 'location-layout';
   const assignments = element('div','');
   const feedback = element('p','');
   feedback.setAttribute('role','status');
-  const {manage,manager,refresh} = createLocationManager(null,feedback);
-  layout.append(assignments,manage);
-  panel.append(layout,manager,feedback);
+  panel.append(assignments,feedback);
   details.append(summary,panel);
   function refreshAssignments() {
     const stock = readStock();
@@ -257,10 +252,7 @@ function addLocationSection(card, readStock, saveStock) {
       assignments.append(editor);
     });
   }
-  card.addEventListener('locations-changed',() => {
-    refreshAssignments();
-    refresh();
-  });
+  card.addEventListener('locations-changed',refreshAssignments);
   refreshAssignments();
   return {details,refreshAssignments};
 }
