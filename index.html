@@ -507,7 +507,7 @@ function createLocationManager(onChange, feedback, initiallyOpen = false) {
   }
   manage.onclick = () => setOpen(manager.hidden);
   setOpen(initiallyOpen);
-  return {manage,manager,refresh};
+  return {manage,manager,refresh,setOpen};
 }
 function addLocationSection(card, readStock, saveStock) {
   const details = element('details','');
@@ -1315,6 +1315,10 @@ function renderLocationOverview(message = '', managerOpen = false) {
     toggle.textContent = mode==='multiple' ? 'Auswahl beenden' : 'Mehrfachauswahl';
     toggle.setAttribute('aria-expanded',String(mode==='multiple'));
     locationGroups.classList.toggle('selecting-stock',mode==='multiple');
+    if (mode==='multiple') {
+      setManagerOpen(false);
+      managerFeedback.textContent = '';
+    }
     status.textContent = '';
     if (host) host.append(transfer,status);
     else management.after(transfer,status);
@@ -1402,7 +1406,7 @@ function renderLocationOverview(message = '', managerOpen = false) {
   locationGroups.classList.remove('selecting-stock');
   const managerFeedback = element('p','');
   managerFeedback.setAttribute('role','status');
-  const {manage,manager} = createLocationManager(message=>renderLocationOverview(message,true),managerFeedback,managerOpen);
+  const {manage,manager,setOpen: setManagerOpen} = createLocationManager(message=>renderLocationOverview(message,true),managerFeedback,managerOpen);
   const toolbar = element('div','');
   toolbar.className = 'location-stock-toolbar';
   toolbar.append(toggle,manage);
