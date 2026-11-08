@@ -37,6 +37,20 @@
 .scan-rolls{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr));gap:.5rem}
 .scan-rolls article{padding:.65rem;margin:0}
 .scan-rolls p{margin:.35rem 0}
+
+#main-menu.workshop-dashboard{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;margin-bottom:1.25rem}
+#main-menu .dashboard-card{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:.35rem;min-height:7rem;padding:.75rem;text-align:left;background:#17282c;border:1px solid #48615f;border-radius:.9rem;overflow-wrap:anywhere}
+#main-menu .dashboard-card strong{line-height:1.2;color:#f2faf8}
+#main-menu .dashboard-detail{color:#b4c8c5;font-size:.82rem;font-weight:400;line-height:1.35}
+#main-menu .dashboard-icon{flex:none;color:var(--mint);width:1.35rem;height:1.35rem}
+#main-menu .dashboard-scan,#main-menu .dashboard-capture{min-height:8rem;padding:.85rem}
+#main-menu .dashboard-scan{background:var(--mint);border-color:var(--mint);color:#10261e}
+#main-menu .dashboard-scan strong,#main-menu .dashboard-scan .dashboard-detail,#main-menu .dashboard-scan .dashboard-icon{color:#10261e}
+#main-menu .dashboard-capture{background:#1e3334;border-color:#73928b}
+#main-menu .dashboard-drying[data-due] .dashboard-detail{color:#ffb49f;font-weight:700}
+#main-menu .dashboard-backup{grid-column:1/-1;justify-self:end;display:inline-flex;gap:.35rem;align-items:center;min-height:44px;margin-top:.55rem;padding:.25rem .7rem;font-size:.83rem;color:#c0d0ce;background:transparent;border:1px solid #48615f;border-radius:.55rem}
+#main-menu .dashboard-backup .dashboard-icon{width:1rem;height:1rem;color:inherit}
+#main-menu a:focus-visible{outline:2px solid #fff;outline-offset:3px}
 </style>
 <main>
 <nav id="page-navigation" aria-label="Seitennavigation" hidden>
@@ -44,14 +58,38 @@
   <a id="all-rolls" href="#filament-bestand" hidden>← Filamentbestand</a>
 </nav>
 <header><h1 id="page-title">Hauptmenü</h1><p id="home-intro">Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
-<nav id="main-menu" aria-label="Hauptmenü">
-  <a id="menu-filaments" href="#filament-bestand">Filamentbestand</a>
-  <a id="menu-locations" href="#bestand-lagerort">Bestand nach Lagerort</a>
-  <a id="new-filament" href="#filament-anlegen">Filament erfassen</a>
-  <a id="menu-scan" href="#filament-scannen">QR-Schnellscan</a>
-  <a href="#meine-drucker">Meine Drucker</a>
-  <a href="#trocknung">Trocknung</a>
-  <a href="#datensicherung">Datensicherung</a>
+<nav id="main-menu" class="workshop-dashboard" aria-label="Hauptmenü">
+  <a id="menu-scan" class="dashboard-card dashboard-scan" href="#filament-scannen" aria-labelledby="label-scan" aria-describedby="detail-scan">
+    <svg class="dashboard-icon" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m13-5h3a2 2 0 0 1 2 2v3M3 16v3a2 2 0 0 0 2 2h3m13-5v3a2 2 0 0 1-2 2h-3M7 12h10m-9-4h2v2H8zm6 6h2v2h-2z"/></svg>
+    <strong id="label-scan">QR-Schnellscan</strong>
+    <span id="detail-scan" class="dashboard-detail">Rolle scannen und Karte öffnen</span>
+  </a>
+  <a id="new-filament" class="dashboard-card dashboard-capture" href="#filament-anlegen" aria-labelledby="label-capture" aria-describedby="detail-capture">
+    <svg class="dashboard-icon" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v10M7 12h10M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/></svg>
+    <strong id="label-capture">Filament erfassen</strong>
+    <span id="detail-capture" class="dashboard-detail">Neue Karten oder Rollen anlegen</span>
+  </a>
+  <a id="menu-filaments" class="dashboard-card dashboard-stock" href="#filament-bestand" aria-labelledby="label-stock" aria-describedby="detail-stock">
+    <svg class="dashboard-icon" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zm0 6a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>
+    <strong id="label-stock">Filamentbestand</strong>
+    <span id="detail-stock" class="dashboard-detail">Rollen und Druckwerte ansehen</span>
+  </a>
+  <a id="menu-locations" class="dashboard-card dashboard-places" href="#bestand-lagerort" aria-labelledby="label-places" aria-describedby="detail-places">
+    <svg class="dashboard-icon" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v13H3zm-1-4h20v4H2zm8 9h4"/></svg>
+    <strong id="label-places">Bestand nach Lagerort</strong>
+    <span id="detail-places" class="dashboard-detail">Rollen finden und umlagern</span>
+  </a>
+  <a id="menu-drying" class="dashboard-card dashboard-drying" href="#trocknung" aria-labelledby="label-drying" aria-describedby="detail-drying">
+    <svg class="dashboard-icon" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15h16M5 19h14M7 12c-2-2 2-3 0-6m5 6c-2-2 2-3 0-7m5 7c-2-2 2-3 0-6"/></svg>
+    <strong id="label-drying">Trocknung</strong>
+    <span id="detail-drying" class="dashboard-detail">Termine und Verlauf ansehen</span>
+  </a>
+  <a id="menu-printers" class="dashboard-card dashboard-printers" href="#meine-drucker" aria-labelledby="label-printers" aria-describedby="detail-printers">
+    <svg class="dashboard-icon" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 3h16v18H4zm0 13h16m-8-9v4m-3 0h6m-3 0v2"/></svg>
+    <strong id="label-printers">Meine Drucker</strong>
+    <span id="detail-printers" class="dashboard-detail">Drucker und Düsen verwalten</span>
+  </a>
+  <a class="dashboard-backup" href="#datensicherung"><svg class="dashboard-icon" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4"/></svg> Datensicherung</a>
 </nav>
 <section id="trocknung" aria-labelledby="page-title" hidden>
   
@@ -312,5 +350,5 @@
     <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
 </template>
 <script src="./filament-stock.js"></script>
-<script src="./filament-app.js?v=7"></script>
+<script src="./filament-app.js?v=8"></script>
 </html>
