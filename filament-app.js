@@ -1450,6 +1450,14 @@ function addLocalQr(card, roll, live = false) {
       image.src = png;
       const download = element('a','QR-Code als PNG herunterladen');
       download.href = png;
+      if (blob) download.addEventListener('click',()=>{
+        const url = URL.createObjectURL(blob);
+        download.href = url;
+        setTimeout(()=>{
+          if (download.href===url) download.href = png;
+          URL.revokeObjectURL(url);
+        },30000);
+      });
       download.download = live ? 'Filament-Etikett.png' : 'Filament-Momentaufnahme.png';
       imageArea.replaceChildren(image,download);
       if (blob) {
