@@ -19,6 +19,7 @@ article:target > .open-roll{display:none}
 .stock-move-choice{display:none}.selecting-stock .stock-move-choice{display:flex;align-items:baseline;gap:.55rem;margin:.45rem 0}.stock-move-choice input{width:auto;flex:none}.stock-transfer button:disabled{opacity:.55;cursor:default}
 .local-qr img{max-width:100%;height:auto}.local-qr button{margin-inline-end:.45rem}
 .filament-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-bottom:.8rem}.filament-actions button{margin:0;padding:.6rem .45rem}.filament-actions button:disabled{background:transparent;color:var(--muted);border:1px solid #58716e;cursor:default}
+#filament-scanner{padding:.85rem;margin-bottom:1rem;border:1px solid #58716e;border-radius:.7rem}#scan-video{display:block;width:100%;max-height:18rem;object-fit:contain;background:#10161c;margin-bottom:.6rem}
 </style>
 <main>
 <header><h1>Filamentlager</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -35,8 +36,15 @@ article:target > .open-roll{display:none}
 <div id="overview">
 <div class="filament-actions" aria-label="Filament hinzufügen">
   <button id="new-filament" type="button" aria-expanded="false" aria-controls="filament-editor">Neues Filament anlegen</button>
-  <button type="button" disabled>Filament scannen</button>
+  <button id="scan-open" type="button" aria-expanded="false" aria-controls="filament-scanner">Filament scannen</button>
 </div>
+<section id="filament-scanner" aria-label="Filament scannen" hidden>
+  <p>Halte den QR-Code vor die Kamera oder wähle ein Foto des Codes.</p>
+  <video id="scan-video" autoplay muted playsinline hidden></video>
+  <label>QR-Foto auswählen<input id="scan-photo" type="file" accept="image/*"></label>
+  <button id="scan-close" type="button">Scanner schließen</button>
+  <p id="scan-status" role="status"></p>
+</section>
 <details id="filament-editor"><summary hidden>Filamentdaten</summary>
 <form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Material<input name="material" required maxlength="100"></label><label>Farbe<input name="farbe" required maxlength="60"></label><label>Durchmesser<input name="durchmesser" placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" placeholder="500 g"></label><label>Drucktemperatur<input name="druck" placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" placeholder="70 °C · 8 Stunden"></label></div><button id="card-save">Filamentkarte speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
 <label for="search">Rollen suchen</label><input id="search" type="search" placeholder="Material oder Farbe">
@@ -1464,6 +1472,124 @@ document.querySelector('#backup-import').onclick = () => {
     backupStatus.textContent = 'Die Sicherung konnte nicht vollständig übernommen werden.';
   }
 };
+
+const scanOpen = document.querySelector('#scan-open');
+const scanPanel = document.querySelector('#filament-scanner');
+const scanVideo = document.querySelector('#scan-video');
+const scanPhoto = document.querySelector('#scan-photo');
+const scanStatus = document.querySelector('#scan-status');
+const scanCanvas = element('canvas','');
+const scanContext = scanCanvas.getContext('2d',{willReadFrequently:true});
+let scannerLibrary, scanStream, scanTimer;
+let scanSession = 0;
+function loadScanner() {
+  if (!scannerLibrary) scannerLibrary = new Promise((resolve,reject) => {
+    const script = element('script','');
+    script.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+    script.integrity = 'sha384-b5Ya4Bq3qCyz39m2ISh+4DxjAIljdeFwK/BsXLuj9gugaNwAcj/ia15fxNZL9Nlx';
+    script.crossOrigin = 'anonymous';
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.append(script);
+  }).catch(error=>{ scannerLibrary = null; throw error; });
+  return scannerLibrary;
+}
+function closeScanner() {
+  scanSession++;
+  clearTimeout(scanTimer);
+  scanStream?.getTracks().forEach(track=>track.stop());
+  scanStream = null;
+  scanVideo.srcObject = null;
+  scanVideo.hidden = true;
+  scanPhoto.value = '';
+  scanPanel.hidden = true;
+  scanOpen.setAttribute('aria-expanded','false');
+}
+function readQr(image,width,height,limit) {
+  const scale = Math.min(1,limit/Math.max(width,height));
+  scanCanvas.width = Math.max(1,Math.round(width*scale));
+  scanCanvas.height = Math.max(1,Math.round(height*scale));
+  scanContext.drawImage(image,0,0,scanCanvas.width,scanCanvas.height);
+  const pixels = scanContext.getImageData(0,0,scanCanvas.width,scanCanvas.height);
+  return jsQR(pixels.data,pixels.width,pixels.height)?.data;
+}
+function openScannedFilament(code) {
+  let address;
+  try { address = new URL(code); } catch { return false; }
+  const route = address.hash.slice(1);
+  const basePath = location.pathname.replace(/index\.html$/,'');
+  if (address.origin!==location.origin || address.pathname.replace(/index\.html$/,'')!==basePath || !route) return false;
+  if (!route.startsWith(sharedPrefix) && document.getElementById(route)?.parentElement!==cards) return false;
+  closeScanner();
+  if (location.hash===address.hash) filter();
+  else location.hash = address.hash;
+  window.scrollTo(0,0);
+  return true;
+}
+scanOpen.onclick = async () => {
+  if (!scanPanel.hidden) { closeScanner(); return; }
+  const session = ++scanSession;
+  scanPanel.hidden = false;
+  scanOpen.setAttribute('aria-expanded','true');
+  if (!navigator.mediaDevices?.getUserMedia) {
+    scanStatus.textContent = 'Live-Kamera ist hier nicht verfügbar. Wähle ein QR-Foto oder öffne das Filamentlager in Safari oder Chrome.';
+    return;
+  }
+  scanStatus.textContent = 'Warte auf Kamerazugriff …';
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});
+    if (session!==scanSession) { stream.getTracks().forEach(track=>track.stop()); return; }
+    scanStream = stream;
+    await loadScanner();
+    if (session!==scanSession) return;
+    scanVideo.srcObject = stream;
+    scanVideo.hidden = false;
+    await scanVideo.play();
+    if (session!==scanSession) return;
+    scanStatus.textContent = 'Halte den QR-Code gut sichtbar vor die Kamera.';
+    function scanFrame() {
+      if (session!==scanSession) return;
+      if (scanVideo.videoWidth && scanVideo.readyState>=2) {
+        const code = readQr(scanVideo,scanVideo.videoWidth,scanVideo.videoHeight,850);
+        if (code && openScannedFilament(code)) return;
+        if (code) scanStatus.textContent = 'Dieser QR-Code gehört nicht zum Filamentlager.';
+      }
+      scanTimer = setTimeout(scanFrame,180);
+    }
+    scanFrame();
+  } catch {
+    if (session!==scanSession) return;
+    scanStream?.getTracks().forEach(track=>track.stop());
+    scanStream = null;
+    scanVideo.srcObject = null;
+    scanVideo.hidden = true;
+    scanStatus.textContent = 'Die Kamera konnte nicht gestartet werden. Prüfe die Kamerafreigabe oder wähle ein QR-Foto.';
+  }
+};
+scanPhoto.onchange = async () => {
+  const file = scanPhoto.files[0];
+  if (!file) return;
+  const session = scanSession;
+  const url = URL.createObjectURL(file);
+  scanStatus.textContent = 'QR-Foto wird gelesen …';
+  try {
+    const image = new Image();
+    image.src = url;
+    await Promise.all([loadScanner(),image.decode()]);
+    if (session!==scanSession) return;
+    const code = readQr(image,image.naturalWidth,image.naturalHeight,1600);
+    if (code && openScannedFilament(code)) return;
+    scanStatus.textContent = code ? 'Dieser QR-Code gehört nicht zum Filamentlager.' : 'Auf diesem Foto wurde kein QR-Code erkannt.';
+  } catch {
+    if (session===scanSession) scanStatus.textContent = 'Das Foto konnte nicht gelesen werden. Wähle ein anderes QR-Foto.';
+  } finally {
+    URL.revokeObjectURL(url);
+    if (session===scanSession) scanPhoto.value = '';
+  }
+};
+document.querySelector('#scan-close').onclick = () => { closeScanner(); scanOpen.focus(); };
+window.addEventListener('hashchange',closeScanner);
+window.addEventListener('pagehide',closeScanner);
 
 search.oninput = filter;
 render();
