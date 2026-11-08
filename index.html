@@ -916,14 +916,15 @@ function stockForCard(cardId) {
   return [{id:'erste-rolle',packaging:'unknown',weight:''}];
 }
 function renderLocationOverview() {
-  const places = readLocations();
-  const groups = new Map(places.map(place=>[place.id,{name:place.name,items:[]} ]));
+  const groups = new Map(readLocations().map(place=>[place.id,{name:place.name,items:[]}]));
   const unassigned = {name:'Nicht angegeben',items:[]};
   for (const card of cards.children) {
     const title = card.querySelector('h2').textContent+' · '+card.dataset.color;
-    for (const [index,roll] of stockForCard(card.id).entries()) {
+    const weightField = [...card.querySelectorAll('dl dt')].find(field=>['Filamentgewicht','Gewicht'].includes(field.textContent));
+    const nominal = weightField?.nextElementSibling?.textContent.trim();
+    for (const roll of stockForCard(card.id)) {
       const group = groups.get(roll.locationId) ?? unassigned;
-      group.items.push({id:card.id,title,index});
+      group.items.push({id:card.id,title,nominal,weight:roll.weight});
     }
   }
   locationGroups.replaceChildren();
@@ -933,12 +934,29 @@ function renderLocationOverview() {
     group.className = 'location-stock-group';
     group.append(element('h3',name+' · '+items.length+(items.length===1?' Rolle':' Rollen')));
     if (items.length) {
-      const list = element('ul','');
+      const byFilament = new Map();
       for (const item of items) {
+        if (!byFilament.has(item.id)) byFilament.set(item.id,{...item,count:0,weighed:0,grams:0});
+        const filament = byFilament.get(item.id);
+        filament.count++;
+        if (item.weight!=null && String(item.weight).trim()!=='' && Number.isFinite(Number(item.weight)) && Number(item.weight)>=0) {
+          filament.weighed++;
+          filament.grams += Number(item.weight);
+        }
+      }
+      const list = element('ul','');
+      for (const item of byFilament.values()) {
         const line = element('li','');
-        const link = element('a',item.title+' · Rolle '+(item.index+1));
+        const link = element('a',item.title);
         link.href = '#lagerbestand/'+item.id;
-        line.append(link);
+        const details = [item.count+(item.count===1?' Rolle':' Rollen')];
+        const missing = item.count-item.weighed;
+        if (item.weighed) details.push(item.grams.toLocaleString('de-DE',{maximumFractionDigits:3})+' g '+(missing?'erfasster Rest':'Rest'));
+        if (missing) {
+          if (item.nominal && item.nominal!=='Nicht angegeben') details.push(item.nominal+' Nenngewicht je Rolle');
+          details.push(missing===1?'1 Restgewicht offen':missing+' Restgewichte offen');
+        }
+        line.append(link,' · '+details.join(' · '));
         list.append(line);
       }
       group.append(list);
