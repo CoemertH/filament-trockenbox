@@ -1449,6 +1449,23 @@ window.addEventListener('scroll',rememberListPosition,{passive:true});
 document.addEventListener('click',event=>{
   if (event.target.closest?.('a[href^="#"]')) rememberListPosition();
 },true);
+function updateDashboardStatus() {
+  const stockLabel = document.querySelector('#detail-stock');
+  const dryingLabel = document.querySelector('#detail-drying');
+  if (!stockLabel || !dryingLabel) return;
+  const intervals = readDryingIntervals();
+  let total = 0;
+  let due = 0;
+  for (const card of cards.querySelectorAll('article[id]')) {
+    for (const roll of stockForCard(card.id)) {
+      total++;
+      if (roll.packaging!=='sealed' && dryingSchedule(roll,intervals[card.id]).state==='due') due++;
+    }
+  }
+  stockLabel.textContent = total===1 ? '1 Rolle im Bestand' : total+' Rollen im Bestand';
+  dryingLabel.textContent = due ? (due===1?'1 Rolle fällig':due+' Rollen fällig') : 'Termine und Verlauf ansehen';
+  dryingLabel.closest('a').toggleAttribute('data-due',due>0);
+}
 function filter() {
   const route = location.hash.slice(1);
   const contexts = [
@@ -1487,6 +1504,7 @@ function filter() {
   printerView.hidden = !printersView;
   if (printersView) renderPrinters();
   menu.hidden = !home;
+  if (home) updateDashboardStatus();
   overview.hidden = !inventoryView;
   const heading = single ? target.querySelector('h2') : null;
   const title = heading ? [heading.textContent,target.dataset.color ?? target.querySelector('.label')?.textContent].filter(Boolean).join(' · ')
