@@ -17,35 +17,45 @@
 .drying-state[data-state=open]{--signal:#b0c2c7}
 .drying-dashboard-card .drying-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.55rem;margin-top:.65rem}
 .drying-dashboard-card .drying-actions button{margin:0}
+#page-navigation{display:flex;flex-wrap:wrap;align-items:center;gap:.45rem;margin-bottom:.75rem}
+#page-navigation a{display:inline-flex;align-items:center;gap:.35rem;min-height:44px;padding:.3rem .65rem;border:1px solid #58716e;border-radius:.6rem;text-decoration:none}
+#page-navigation+header{padding:.35rem 0 .8rem}
+#page-navigation #all-rolls{margin:0}
+#page-navigation:has(#all-rolls:not([hidden]))+header h1{font-size:clamp(2rem,7vw,4rem)}
+#page-navigation[hidden]+header{padding:2rem 0}
+#cards .card-page-title{font-size:clamp(1.7rem,5.7vw,2.6rem);line-height:1.15;overflow-wrap:anywhere}
 </style>
 <main>
-<header><h1>Filamentlager</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
-<a id="all-rolls" href="./" hidden>← Alle Rollen</a>
+<nav id="page-navigation" aria-label="Seitennavigation" hidden>
+  <a id="home-link" href="#"><svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg> Hauptmenü</a>
+  <a id="all-rolls" href="#filament-bestand" hidden>← Filamentbestand</a>
+</nav>
+<header><h1 id="page-title">Hauptmenü</h1><p id="home-intro">Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
 <nav id="main-menu" aria-label="Hauptmenü">
-  <a id="menu-filaments" href="#filament-bestand">Filament Bestand</a>
-  <a id="menu-locations" href="#bestand-lagerort">Bestand Lagerort</a>
+  <a id="menu-filaments" href="#filament-bestand">Filamentbestand</a>
+  <a id="menu-locations" href="#bestand-lagerort">Bestand nach Lagerort</a>
   <a id="new-filament" href="#filament-anlegen">Neues Filament anlegen</a>
   <a id="menu-scan" href="#filament-scannen">Filament scannen</a>
   <a href="#meine-drucker">Meine Drucker</a>
   <a href="#trocknung">Trocknung</a>
   <a href="#datensicherung">Datensicherung</a>
 </nav>
-<section id="trocknung" aria-labelledby="drying-dashboard-title" hidden>
-  <h2 id="drying-dashboard-title">Trocknung</h2>
+<section id="trocknung" aria-labelledby="page-title" hidden>
+  
   <p>Die Ampel zeigt geplante Termine anhand deiner Intervalle und Einträge.</p>
   <label class="available-filter"><input id="drying-show-sealed" type="checkbox"> Originalverpackte Rollen anzeigen</label>
   <p id="drying-dashboard-status" role="status"></p>
   <div id="drying-dashboard-rolls"></div>
 </section>
-<section id="bestand-lagerort" aria-labelledby="location-stock-title" hidden>
-  <h2 id="location-stock-title">Bestand Lagerort</h2>
+<section id="bestand-lagerort" aria-labelledby="page-title" hidden>
+  
   <p>Hier siehst du, welche Rollen an welchem Lagerort liegen.</p>
   <div id="location-stock-groups"></div>
 </section>
 <details id="filament-editor" hidden><summary hidden>Filamentdaten</summary>
 <form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Filamentname<input name="material" required maxlength="100"></label><label>Materialart<input name="materialart" list="material-types" maxlength="40" placeholder="z. B. PLA, PETG oder TPU"></label><datalist id="material-types"></datalist><details class="color-picker"><summary>Farbe<span class="color-preview"><span class="color-preview-sample" aria-hidden="true"></span><span class="color-preview-name">Keine Farbe gewählt</span></span></summary><div class="color-palette" aria-label="Gängige Farben"></div><label>Farbname<input name="farbe" required maxlength="60" placeholder="Farbe auswählen oder eigenen Namen eingeben"></label><label>Farbmuster für Sonderfarben (optional)<input name="farbton" maxlength="7" pattern="#[0-9a-fA-F]{6}" placeholder="#AABBCC"></label><label>Farbmuster visuell wählen<input type="color" id="shade-picker" value="#808080"></label><label>Farbfamilie<select name="farbfamilie"><option value="">Automatisch zuordnen</option></select></label></details><label>Durchmesser<input name="durchmesser" placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" placeholder="500 g"></label><label>Drucktemperatur<input name="druck" placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" placeholder="70 °C · 8 Stunden"></label><label>Produktseite beim Hersteller (optional)<input name="produktseite" type="url" placeholder="https://…"></label></div><button id="card-save">Filamentkarte speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
-<section id="meine-drucker" aria-labelledby="printer-title" hidden>
-  <h2 id="printer-title">Meine Drucker</h2>
+<section id="meine-drucker" aria-labelledby="page-title" hidden>
+  
   <div id="printer-list"></div>
   <button id="printer-add" type="button" aria-expanded="false" aria-controls="printer-form">Drucker hinzufügen</button>
   <form id="printer-form" hidden>
@@ -58,8 +68,8 @@
   </form>
   <p id="printer-status" role="status"></p>
 </section>
-<section id="scan-view" aria-labelledby="scan-title" hidden>
-<h2 id="scan-title">Filament scannen</h2>
+<section id="scan-view" aria-labelledby="page-title" hidden>
+
 <button id="scan-open" type="button" aria-expanded="false" aria-controls="filament-scanner">Scanner öffnen</button>
 <section id="filament-scanner" aria-label="Filament scannen" hidden>
   <p>Halte den QR-Code vor die Kamera oder wähle ein Foto des Codes.</p>
@@ -258,7 +268,7 @@
 <p id="empty" hidden>Keine passende Rolle gefunden.</p>
 <p id="missing-local-card" hidden>Diese Filamentkarte ist in diesem Browser nicht gespeichert. Importiere deine Datensicherung, um das Etikett hier zu öffnen.</p>
 
-<section id="datensicherung" aria-labelledby="backup-title" hidden><h2 id="backup-title">Datensicherung</h2>
+<section id="datensicherung" aria-labelledby="page-title" hidden>
 <p>Sichere eigene Karten, Druckprofile, Bestände, Lagerorte, deren Reihenfolge, Trocknungsverläufe und Trocknungsintervalle. Die Datei kannst du auch in einem anderen Browser importieren.</p>
 <button id="backup-export" type="button">Sicherung exportieren</button>
 <label>Sicherung auswählen<input id="backup-file" type="file" accept=".json,application/json"></label>
@@ -289,5 +299,5 @@
     <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
 </template>
 <script src="./filament-stock.js"></script>
-<script src="./filament-app.js?v=4"></script>
+<script src="./filament-app.js?v=5"></script>
 </html>
