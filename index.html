@@ -18,6 +18,7 @@ article:target > .open-roll{display:none}
 .stock-detail>article>:not(.card-heading):not(.locations):not(.stock){display:none!important}.stock-cancel{margin-inline-start:.5rem}
 .stock-move-choice{display:none}.selecting-stock .stock-move-choice{display:flex;align-items:baseline;gap:.55rem;margin:.45rem 0}.stock-move-choice input{width:auto;flex:none}.stock-transfer button:disabled{opacity:.55;cursor:default}
 .local-qr img{max-width:100%;height:auto}.local-qr button{margin-inline-end:.45rem}
+.filament-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-bottom:.8rem}.filament-actions button{margin:0;padding:.6rem .45rem}.filament-actions button:disabled{background:transparent;color:var(--muted);border:1px solid #58716e;cursor:default}
 </style>
 <main>
 <header><h1>Filamentlager</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -31,7 +32,14 @@ article:target > .open-roll{display:none}
   <p>Hier siehst du, welche Rollen an welchem Lagerort liegen.</p>
   <div id="location-stock-groups"></div>
 </section>
-<div id="overview"><label for="search">Rollen suchen</label><input id="search" type="search" placeholder="Material oder Farbe">
+<div id="overview">
+<div class="filament-actions" aria-label="Filament hinzufügen">
+  <button id="new-filament" type="button" aria-expanded="false" aria-controls="filament-editor">Neues Filament anlegen</button>
+  <button type="button" disabled>Filament scannen</button>
+</div>
+<details id="filament-editor"><summary hidden>Filamentdaten</summary>
+<form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Material<input name="material" required maxlength="100"></label><label>Farbe<input name="farbe" required maxlength="60"></label><label>Durchmesser<input name="durchmesser" placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" placeholder="500 g"></label><label>Drucktemperatur<input name="druck" placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" placeholder="70 °C · 8 Stunden"></label></div><button id="card-save">Filamentkarte speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
+<label for="search">Rollen suchen</label><input id="search" type="search" placeholder="Material oder Farbe">
 <div class="fields" style="margin-top:.75rem"><label>Material<select id="material-filter"></select></label><label>Farbe<select id="color-filter"></select></label></div><label class="available-filter"><input id="available-only" type="checkbox"> Nur verfügbare Filamente</label></div>
 <section id="cards" aria-label="Filamentrollen">
 <article id="support-pla-petg-schwarz">
@@ -216,8 +224,7 @@ article:target > .open-roll{display:none}
 </article>
 </section>
 <p id="empty" hidden>Keine passende Rolle gefunden.</p>
-<details><summary>Neues Filament anlegen oder bearbeiten</summary>
-<form id="form"><p>Eigene Einträge werden in diesem Browser gespeichert.</p><div class="fields"><label>Material<input name="material" required maxlength="100"></label><label>Farbe<input name="farbe" required maxlength="60"></label><label>Durchmesser<input name="durchmesser" placeholder="1,75 mm"></label><label>Gewicht<input name="gewicht" placeholder="500 g"></label><label>Drucktemperatur<input name="druck" placeholder="190–220 °C"></label><label>Trocknung<input name="trocknung" placeholder="70 °C · 8 Stunden"></label></div><button id="card-save">Filamentkarte speichern</button> <button type="button" id="reset" hidden>Bearbeitung beenden</button><p id="status" role="status"></p></form></details>
+
 <details id="backup"><summary>Datensicherung</summary>
 <p>Sichere eigene Filamentkarten, X2D-Druckwerte, Bestände und Leergewichte. Die Datei kannst du auch in einem anderen Browser importieren.</p>
 <button id="backup-export" type="button">Sicherung exportieren</button>
@@ -1291,6 +1298,15 @@ function render() {
   filter();
 }
 const cardSave = document.querySelector('#card-save');
+const filamentEditor = form.closest('details');
+const newFilament = document.querySelector('#new-filament');
+newFilament.onclick = () => {
+  filamentEditor.open = !filamentEditor.open;
+  if (filamentEditor.open) form.elements.material.focus();
+};
+filamentEditor.addEventListener('toggle',() => {
+  newFilament.setAttribute('aria-expanded',String(filamentEditor.open));
+});
 function updateCardSave() {
   const savedCard = rolls.find(roll=>roll.id===editing);
   const changed = !savedCard || [...form.querySelectorAll('input')].some(input=>input.value!==(savedCard[input.name] ?? ''));
