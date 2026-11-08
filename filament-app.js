@@ -27,7 +27,7 @@ const homeIntro = document.querySelector('header p');
 const pageTitles = {
   'filament-bestand':'Filamentbestand',
   'bestand-lagerort':'Bestand nach Lagerort',
-  'filament-anlegen':'Neues Filament anlegen',
+  'filament-anlegen':'Filament erfassen',
   'filament-scannen':'Filament scannen',
   'meine-drucker':'Meine Drucker',
   'trocknung':'Trocknung',
@@ -525,6 +525,10 @@ function addStockSection(card, profile) {
       if (!current.some(item=>item.id===rollId)) return false;
       return saveStock(current.map(item=>item.id===rollId ? {...item,dryingDue} : item));
     }
+  });
+  card.addEventListener('stock-batch-added',()=>{
+    renderStock(readStock());
+    location.refreshAssignments();
   });
   profile.after(quickDrying,location.details,section);
   renderStock(readStock());
@@ -1563,6 +1567,7 @@ function render() {
     edit.onclick = () => {
       editReturnRoute = location.hash.slice(1) === 'filament-bestand' ? 'bestand/'+card.id : location.hash.slice(1);
       editing = roll.id;
+      showCapture('new');
       const current = rolls.find(item=>item.id===editing);
       for (const field of form.querySelectorAll('[name]')) field.value = current?.[field.name] ?? '';
       colorPicker.open = false;
@@ -1640,15 +1645,167 @@ updateColorPalette();
 const cardSave = document.querySelector('#card-save');
 const filamentEditor = form.closest('details');
 const scanView = document.querySelector('#scan-view');
-document.querySelector('#new-filament').onclick = () => { clearEditor(); status.textContent = ''; };
+document.querySelector('#new-filament').onclick = () => { clearEditor(); showCapture('menu'); status.textContent = ''; };
 function updateCardSave() {
   const savedCard = rolls.find(roll=>roll.id===editing);
   const changed = !savedCard || [...form.querySelectorAll('[name]')].some(input=>input.value!==(savedCard[input.name] ?? ''));
   cardSave.hidden = cardSave.disabled = !changed;
-  cardSave.textContent = savedCard ? 'Änderung speichern' : 'Filamentkarte speichern';
+  cardSave.textContent = savedCard ? 'Änderung speichern' : batchLabel(createBatch.quantity.valueAsNumber || 1,'speichern');
 }
 form.addEventListener('input',updateCardSave);
 form.addEventListener('change',updateCardSave);
+function createBatchFields() {
+  const fields = element('fieldset','');
+  fields.className = 'fields capture-batch';
+  fields.append(element('legend','Rollen'));
+  function addField(title,control) {
+    const label = element('label',title);
+    label.append(control);
+    fields.append(label);
+  }
+  const quantity = element('input','');
+  quantity.type = 'number';
+  quantity.min = '1';
+  quantity.max = '100';
+  quantity.step = '1';
+  quantity.defaultValue = '1';
+  quantity.required = true;
+  quantity.inputMode = 'numeric';
+  addField('Anzahl der Rollen',quantity);
+  const locationSelect = element('select','');
+  addField('Lagerort (optional)',locationSelect);
+  const packaging = element('select','');
+  packaging.add(new Option('Unbekannt','unknown'));
+  packaging.add(new Option('Originalverpackt','sealed'));
+  packaging.add(new Option('Angebrochen','opened'));
+  addField('Verpackungsstatus',packaging);
+  function refreshLocations() {
+    const selected = locationSelect.value;
+    locationSelect.replaceChildren(new Option('Nicht angegeben',''),...readLocations().map(place=>new Option(place.name,place.id)));
+    if ([...locationSelect.options].some(option=>option.value===selected)) locationSelect.value = selected;
+  }
+  refreshLocations();
+  return {fields,quantity,locationSelect,packaging,refreshLocations};
+}
+function makeBatch(batch) {
+  const count = batch.quantity.valueAsNumber;
+  const locationId = batch.locationSelect.value;
+  if (!Number.isInteger(count) || count<1 || count>100 || (locationId && !readLocations().some(place=>place.id===locationId))) return null;
+  return Array.from({length:count},()=>({id:crypto.randomUUID(),weight:'',packaging:batch.packaging.value,locationId}));
+}
+const captureActions = element('div','');
+captureActions.className = 'capture-actions';
+const existingButton = element('button','Rollen zu vorhandenem Filament hinzufügen');
+const createButton = element('button','Neues Filament anlegen');
+existingButton.type = createButton.type = 'button';
+captureActions.append(existingButton,createButton);
+const batchForm = element('form','');
+const query = element('input','');
+query.type = 'search';
+query.placeholder = 'Name, Material oder Farbe';
+const queryLabel = element('label','Vorhandenes Filament suchen');
+queryLabel.append(query);
+const results = element('div','');
+results.className = 'capture-results';
+const existingBatch = createBatchFields();
+const createBatch = createBatchFields();
+const batchSubmit = element('button','Rolle hinzufügen');
+const batchStatus = element('p','');
+batchStatus.setAttribute('role','status');
+batchForm.append(queryLabel,results,existingBatch.fields,batchSubmit,batchStatus);
+const captureDone = element('section','');
+captureDone.setAttribute('aria-live','polite');
+filamentEditor.insertBefore(captureActions,form);
+filamentEditor.insertBefore(batchForm,form);
+filamentEditor.insertBefore(captureDone,form);
+cardSave.before(createBatch.fields);
+let captureMode = 'menu';
+let selectedCard = '';
+function batchLabel(count,verb) {
+  return count===1 ? '1 Rolle '+verb : count+' Rollen '+verb;
+}
+function updateBatchSubmit() {
+  batchSubmit.textContent = batchLabel(existingBatch.quantity.valueAsNumber || 1,'hinzufügen');
+  batchSubmit.disabled = !selectedCard || !existingBatch.quantity.validity.valid;
+}
+function renderCaptureMatches() {
+  const terms = normalizeSearch(query.value).split(' ').filter(Boolean);
+  const matches = [...cards.querySelectorAll('article[id]')].filter(card=>{
+    const text = normalizeSearch([card.querySelector('h2').textContent,card.dataset.material,card.dataset.color].join(' '));
+    return terms.every(term=>text.includes(term));
+  });
+  if (!matches.some(card=>card.id===selectedCard)) selectedCard = '';
+  results.replaceChildren(...matches.map(card=>{
+    const button = element('button',card.querySelector('h2').textContent+' · '+card.dataset.color);
+    button.type = 'button';
+    button.setAttribute('aria-pressed',String(card.id===selectedCard));
+    button.onclick = () => {
+      selectedCard = card.id;
+      for (const option of results.children) option.setAttribute('aria-pressed',String(option===button));
+      batchStatus.textContent = '';
+      updateBatchSubmit();
+    };
+    return button;
+  }));
+  if (!matches.length) results.append(element('p','Keine passende Filamentkarte gefunden.'));
+  updateBatchSubmit();
+}
+function showCapture(mode) {
+  captureMode = mode;
+  captureActions.hidden = Boolean(editing) || mode==='done';
+  existingButton.setAttribute('aria-pressed',String(mode==='existing'));
+  createButton.setAttribute('aria-pressed',String(mode==='new'));
+  form.hidden = !editing && mode!=='new';
+  batchForm.hidden = Boolean(editing) || mode!=='existing';
+  captureDone.hidden = mode!=='done';
+  createBatch.fields.hidden = createBatch.fields.disabled = Boolean(editing);
+  if (mode==='existing') {
+    existingBatch.refreshLocations();
+    renderCaptureMatches();
+  }
+  if (mode==='new') {
+    createBatch.refreshLocations();
+    updateCardSave();
+  }
+}
+function finishCapture(cardId,count) {
+  const link = element('a','Zur Filamentkarte');
+  link.href = '#bestand/'+cardId;
+  const more = element('button','Weitere Rollen erfassen');
+  more.type = 'button';
+  more.onclick = () => { showCapture('menu'); existingButton.focus(); };
+  const message = element('p',batchLabel(count,'hinzugefügt')+'.');
+  message.tabIndex = -1;
+  captureDone.replaceChildren(message,link,element('br',''),more);
+  showCapture('done');
+  message.focus();
+}
+existingButton.onclick = () => { showCapture('existing'); query.focus(); };
+createButton.onclick = () => { showCapture('new'); form.elements.material.focus(); };
+query.oninput = renderCaptureMatches;
+existingBatch.quantity.oninput = updateBatchSubmit;
+batchForm.onsubmit = event => {
+  event.preventDefault();
+  const card = document.getElementById(selectedCard);
+  const batch = makeBatch(existingBatch);
+  if (!card || card.parentElement!==cards || !batch) {
+    batchStatus.textContent = 'Prüfe Filamentkarte, Anzahl und Lagerort.';
+    return;
+  }
+  try { localStorage.setItem('filament-bestand:'+card.id,JSON.stringify([...stockForCard(card.id),...batch])); }
+  catch { batchStatus.textContent = 'Die Rollen konnten nicht gespeichert werden.'; return; }
+  card.dispatchEvent(new Event('stock-batch-added'));
+  batchForm.reset();
+  selectedCard = '';
+  batchStatus.textContent = '';
+  finishCapture(card.id,batch.length);
+};
+showCapture('menu');
+form.elements.produktseite.addEventListener('invalid',()=>{
+  const extra = form.querySelector('.capture-extra');
+  if (extra) extra.open = true;
+});
+
 function findDuplicateCard(material,color) {
   const normalize = value => value.normalize('NFKC').trim().toLocaleLowerCase('de').replace(/\s+/g,' ');
   return [...cards.children].find(card => card.id !== 'eigene-rolle-' + editing && normalize(card.querySelector('h2').textContent) === normalize(material) && normalize(card.dataset.color) === normalize(color));
@@ -1706,29 +1863,44 @@ form.onsubmit = event => {
   event.preventDefault();
   if (cardSave.disabled) return;
   const fields = Object.fromEntries([...new FormData(form)].map(([field,value]) => [field,value.trim()]));
+  if (!editing && !fields.materialart) { status.textContent = 'Bitte eine Materialart angeben.'; form.elements.materialart.focus(); return; }
   if (!fields.material || !fields.farbe) { status.textContent = 'Bitte Material und Farbe eintragen.'; return; }
   if (fields.produktseite && !productPage(fields.produktseite)) { status.textContent = 'Gib eine gültige Produktadresse mit https:// oder http:// ein.'; return; }
   const duplicate = findDuplicateCard(fields.material,fields.farbe);
   if (duplicate) {
-    const show = element('button','Rolle zum vorhandenen Bestand hinzufügen');
+    const show = element('button','Rollen zur vorhandenen Karte hinzufügen');
     show.type = 'button';
     show.onclick = () => {
-      search.value = materialFilter.value = colorFilter.value = '';
-      availableOnly.checked = false;
-      location.hash = duplicate.id;
-      filter();
-      const stock = duplicate.querySelector('.stock');
-      stock.open = true;
-      stock.scrollIntoView({block:'start'});
-      stock.querySelector('.stock-add')?.focus();
+      selectedCard = duplicate.id;
+      query.value = duplicate.querySelector('h2').textContent;
+      existingBatch.quantity.value = createBatch.quantity.value;
+      showCapture('existing');
+      existingBatch.locationSelect.value = createBatch.locationSelect.value;
+      existingBatch.packaging.value = createBatch.packaging.value;
+      existingBatch.quantity.focus();
     };
     status.replaceChildren('Für dieses Filament gibt es bereits eine Karte. ',show);
     return;
   }
   const returnRoute = editing ? editReturnRoute : '';
+  const batch = editing ? null : makeBatch(createBatch);
+  if (!editing && !batch) { status.textContent = 'Prüfe Anzahl und Lagerort.'; return; }
   const roll = {...fields,id:editing ?? crypto.randomUUID()};
+  const cardId = 'eigene-rolle-'+roll.id;
   const next = editing ? rolls.map(item => item.id === editing ? roll : item) : [...rolls,roll];
-  try { localStorage.setItem(key,JSON.stringify(next)); } catch { status.textContent = 'Speichern in diesem Browser fehlgeschlagen.'; return; }
+  const stockKey = 'filament-bestand:'+cardId;
+  let wroteStock = false;
+  try {
+    if (batch) {
+      localStorage.setItem(stockKey,JSON.stringify(batch));
+      wroteStock = true;
+    }
+    localStorage.setItem(key,JSON.stringify(next));
+  } catch {
+    if (wroteStock) { try { localStorage.removeItem(stockKey); } catch {} }
+    status.textContent = 'Speichern in diesem Browser fehlgeschlagen.';
+    return;
+  }
   rolls = next;
   if (!editing) {
     try { localStorage.removeItem(colorDraftKey); } catch {}
@@ -1736,7 +1908,8 @@ form.onsubmit = event => {
   clearEditor();
   search.value = '';
   render();
-  location.hash = returnRoute || 'bestand/eigene-rolle-' + roll.id;
+  if (batch) finishCapture(cardId,batch.length);
+  else location.hash = returnRoute || 'bestand/'+cardId;
   status.textContent = 'Gespeichert';
 };
 
