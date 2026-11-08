@@ -51,6 +51,47 @@
 #main-menu .dashboard-backup{grid-column:1/-1;justify-self:end;display:inline-flex;gap:.35rem;align-items:center;min-height:44px;margin-top:.55rem;padding:.25rem .7rem;font-size:.83rem;color:#c0d0ce;background:transparent;border:1px solid #48615f;border-radius:.55rem}
 #main-menu .dashboard-backup .dashboard-icon{width:1rem;height:1rem;color:inherit}
 #main-menu a:focus-visible{outline:2px solid #fff;outline-offset:3px}
+
+main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
+.work-panel,.inventory-view>article,.location-stock-group,.drying-dashboard-card,#printer-list>article{background:var(--work-surface);border:1px solid var(--work-border);border-radius:.9rem;padding:.8rem}
+.work-panel{margin:.65rem 0}
+.action-grid,.capture-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem;margin:.65rem 0}
+.action-card{display:flex;position:relative;flex-direction:column;align-items:flex-start;justify-content:center;gap:.28rem;min-height:4.4rem;margin:0;padding:.7rem .75rem;border:1px solid var(--work-border);border-radius:.8rem;text-align:left;overflow-wrap:anywhere;line-height:1.2}
+.action-card small,.action-note{font-size:.82rem;line-height:1.3;font-weight:400}
+.action-note{display:block;margin:.25rem 0 0;color:var(--work-muted)}
+.action-primary{background:var(--mint);color:#10261e}
+.action-secondary,.action-card[aria-pressed=false]{background:#1e3334;border:1px solid #73928b;color:#f2faf8}
+.action-secondary:not(.action-card),.action-danger{min-height:44px}
+.action-danger{background:#482b2d;border:1px solid #cc8178;color:#ffe0db}
+.action-card[aria-pressed=true]{background:var(--mint);color:#10261e;outline:0}
+.action-secondary small,.action-card[aria-pressed=false] small{color:var(--work-muted)}
+.file-action{cursor:pointer}
+.file-action input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.file-action:focus-within,.action-card:focus-visible{outline:2px solid var(--mint);outline-offset:3px}
+.inventory-filters .available-filter{margin-bottom:0}
+.inventory-view>article{margin:.55rem 0}
+.inventory-view>article>:not(.card-heading):not(.open-roll){display:none!important}
+.inventory-view .card-heading h2{font-size:1.15rem;line-height:1.25;overflow-wrap:anywhere}
+.inventory-view .card-heading .label{font-size:.73rem}
+.inventory-count{display:none;color:var(--work-muted);font-size:.83rem;margin:.2rem 0 0}
+.inventory-view .inventory-count{display:block}
+.inventory-view .open-roll{display:inline-flex;align-items:center;min-height:44px;margin-top:.15rem}
+.filament-section>summary{min-height:44px;padding:.6rem .65rem;border:1px solid var(--work-border);border-radius:.65rem;background:var(--work-surface);overflow-wrap:anywhere}
+.filament-section[open]>summary{border-color:#73928b}
+.filament-section>summary:hover{border-color:var(--mint)}
+.scan-result-actions{margin:1rem 0}
+.scan-result-actions a{display:inline-flex;align-items:center;min-height:44px;padding:.35rem .65rem;border-radius:.6rem;text-decoration:none}
+#scan-ergebnis .card-heading{margin:.65rem 0}
+#scan-ergebnis .scan-rolls article{background:var(--work-surface);border-color:var(--work-border)}
+#scan-ergebnis .scan-profile{margin:.8rem 0}
+.location-stock-toolbar>div{max-width:100%}
+.location-stock-group>details>summary{min-height:44px}
+#printer-list>article h3{margin-top:0}
+#printer-list .printer-nozzles-summary{margin:.4rem 0}
+#printer-list summary,.drying-dashboard-card summary{min-height:44px;align-content:center}
+.drying-dashboard-card .drying-history>summary{display:list-item;width:fit-content;padding:.55rem .65rem;border-radius:.6rem;background:var(--mint);color:#10261e;font-weight:700}
+.drying-dashboard-card .drying-history[open]>summary{margin-bottom:.45rem}
+@media(max-width:360px){.action-grid,.capture-actions{grid-template-columns:1fr}}
 </style>
 <main>
 <nav id="page-navigation" aria-label="Seitennavigation" hidden>
@@ -108,7 +149,7 @@
 <section id="meine-drucker" aria-labelledby="page-title" hidden>
   
   <div id="printer-list"></div>
-  <button id="printer-add" type="button" aria-expanded="false" aria-controls="printer-form">Drucker hinzufügen</button>
+  <button id="printer-add" class="action-card action-primary" type="button" aria-expanded="false" aria-controls="printer-form" aria-labelledby="printer-add-title" aria-describedby="printer-add-help"><strong id="printer-add-title">Drucker hinzufügen</strong><small id="printer-add-help">Name und Düsen festlegen</small></button>
   <form id="printer-form" hidden>
     <div class="fields">
       <label>Druckermodell oder Name<input name="name" required maxlength="80" placeholder="z. B. Bambu Lab A1"></label>
@@ -121,16 +162,17 @@
 </section>
 <section id="scan-view" aria-labelledby="page-title" hidden>
 
-<button id="scan-open" type="button" aria-expanded="false" aria-controls="filament-scanner">Scanner öffnen</button>
-<section id="filament-scanner" aria-label="Filament scannen" hidden>
-  <p>Halte den QR-Code vor die Kamera oder wähle ein Foto des Codes.</p>
+<div class="action-grid">
+  <button id="scan-open" class="action-card action-primary" type="button" aria-expanded="false" aria-controls="filament-scanner" aria-labelledby="scan-camera-title" aria-describedby="scan-camera-help"><strong id="scan-camera-title">Scanner öffnen</strong><small id="scan-camera-help">QR-Code mit der Kamera lesen</small></button>
+  <label class="action-card action-secondary file-action"><strong id="scan-photo-title">QR-Foto auswählen</strong><small id="scan-photo-help">Gespeichertes Bild verwenden</small><input id="scan-photo" type="file" accept="image/*" aria-labelledby="scan-photo-title" aria-describedby="scan-photo-help"></label>
+</div>
+<section id="filament-scanner" class="work-panel" aria-label="Live-Kamera" hidden>
   <video id="scan-video" autoplay muted playsinline hidden></video>
-  <label>QR-Foto auswählen<input id="scan-photo" type="file" accept="image/*"></label>
-  <button id="scan-close" type="button">Scanner schließen</button>
-  <p id="scan-status" role="status"></p>
+  <button id="scan-close" class="action-secondary" type="button">Scanner schließen</button>
 </section>
+<p id="scan-status" role="status"></p>
 </section>
-<div id="overview" hidden>
+<div id="overview" class="work-panel inventory-filters" hidden>
 
 <label for="search">Filament suchen</label><input id="search" type="search" placeholder="Name, Material oder Farbe">
 <div class="fields" style="margin-top:.75rem"><label>Material<select id="material-filter"></select></label><label>Farbfamilie<select id="color-filter"></select></label></div><label class="available-filter"><input id="available-only" type="checkbox"> Nur verfügbare Filamente</label></div>
@@ -321,12 +363,14 @@
 
 <section id="datensicherung" aria-labelledby="page-title" hidden>
 <p>Sichere eigene Karten, Druckprofile, Bestände, Lagerorte, deren Reihenfolge, Trocknungsverläufe und Trocknungsintervalle. Die Datei kannst du auch in einem anderen Browser importieren.</p>
-<button id="backup-export" type="button">Sicherung exportieren</button>
-<label>Sicherung auswählen<input id="backup-file" type="file" accept=".json,application/json"></label>
+<div class="action-grid">
+  <button id="backup-export" class="action-card action-primary" type="button" aria-labelledby="backup-export-title" aria-describedby="backup-export-help"><strong id="backup-export-title">Sicherung exportieren</strong><small id="backup-export-help">Bestand als JSON-Datei speichern</small></button>
+  <label class="action-card action-secondary file-action"><strong id="backup-select-title">Sicherung importieren</strong><small id="backup-select-help">Datei auswählen und Vorschau prüfen</small><input id="backup-file" type="file" accept=".json,application/json" aria-labelledby="backup-select-title" aria-describedby="backup-select-help"></label>
+</div>
 <p id="backup-status" role="status"></p>
-<div id="backup-preview" hidden>
+<div id="backup-preview" class="work-panel" hidden>
 <label>Bei Konflikten<select id="backup-conflict"><option value="keep">Vorhandene Daten behalten</option><option value="replace">Werte aus der Sicherung übernehmen</option></select></label>
-<button id="backup-import" type="button">Sicherung importieren</button>
+<button id="backup-import" type="button">Sicherung übernehmen</button>
 </div></section>
 </main>
 <template id="specs-sunlu-pla-plus">
@@ -350,5 +394,5 @@
     <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
 </template>
 <script src="./filament-stock.js"></script>
-<script src="./filament-app.js?v=8"></script>
+<script src="./filament-app.js?v=9"></script>
 </html>
