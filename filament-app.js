@@ -28,7 +28,7 @@ const pageTitles = {
   'filament-bestand':'Filamentbestand',
   'bestand-lagerort':'Bestand nach Lagerort',
   'filament-anlegen':'Filament erfassen',
-  'filament-scannen':'Filament scannen',
+  'filament-scannen':'QR-Schnellscan',
   'meine-drucker':'Meine Drucker',
   'trocknung':'Trocknung',
   'datensicherung':'Datensicherung'
@@ -589,6 +589,17 @@ function makeSwatch(shade) {
   swatch.setAttribute('aria-hidden','true');
   return swatch;
 }
+const printProfileLabels = {duese:'Düsentemperatur (°C)',platte:'Druckplatte',bett:'Druckbett (°C)',fluss:'Maximaler Volumenstrom (mm³/s)',kWert:'K-Wert',flussverhaeltnis:'Flussverhältnis',notiz:'Notizen'};
+function printProfileKey(cardId,printerId,nozzleId) {
+  if (printerId==='x2d' && (nozzleId==='0' || nozzleId==='1')) return 'filament-x2d:'+cardId+(nozzleId==='1'?':secondary':'');
+  return 'filament-druckprofil:'+printerId+':'+nozzleId+':'+cardId;
+}
+function readSavedPrintProfile(cardId,printerId,nozzleId) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(printProfileKey(cardId,printerId,nozzleId)));
+    return saved && typeof saved==='object' && !Array.isArray(saved) ? saved : {};
+  } catch { return {}; }
+}
 function prepareCard(card, color, metadata = {}) {
   const title = card.querySelector('h2').textContent;
   card.dataset.material = materialType(title,metadata.materialart);
@@ -636,19 +647,13 @@ function prepareCard(card, color, metadata = {}) {
     nozzle.value = activeNozzle;
     nozzleLabel.hidden = options.length===1;
   }
-  function profileStorageKey() {
-    if (activePrinter.id==='x2d' && (activeNozzle==='0' || activeNozzle==='1')) return 'filament-x2d:'+card.id+(activeNozzle==='1'?':secondary':'');
-    return 'filament-druckprofil:'+activePrinter.id+':'+activeNozzle+':'+card.id;
-  }
-  function readProfile() {
-    try { return JSON.parse(localStorage.getItem(profileStorageKey())) ?? {}; }
-    catch { return {}; }
-  }
+  const profileStorageKey = () => printProfileKey(card.id,activePrinter.id,activeNozzle);
+  const readProfile = () => readSavedPrintProfile(card.id,activePrinter.id,activeNozzle);
   refreshPrinterOptions();
   refreshNozzleOptions();
   card.addEventListener('printers-changed',() => { refreshPrinterOptions(); refreshNozzleOptions(); });
   const saved = readProfile();
-  for (const [name,label] of Object.entries({duese:'Düsentemperatur (°C)',platte:'Druckplatte',bett:'Druckbett (°C)',fluss:'Maximaler Volumenstrom (mm³/s)',kWert:'K-Wert',flussverhaeltnis:'Flussverhältnis',notiz:'Notizen'})) {
+  for (const [name,label] of Object.entries(printProfileLabels)) {
     const field = element('label',label);
     const input = element('input','');
     input.name = name;
@@ -1452,15 +1457,16 @@ function filter() {
     ['trocknung/','trocknung']
   ];
   const context = contexts.find(([prefix])=>route.startsWith(prefix));
-  const id = context ? route.slice(context[0].length) : route;
-  const shared = sharedCardFor(route);
+  const resultView = route.startsWith(scanResultPrefix);
+  const id = resultView ? route.slice(scanResultPrefix.length) : context ? route.slice(context[0].length) : route;
+  const shared = sharedCardFor(resultView ? id : route);
   const missingLocalCard = /^eigene-rolle-[a-f0-9-]{36}$/i.test(id) && !document.getElementById(id);
-  document.querySelector('#missing-local-card').hidden = !missingLocalCard;
+  document.querySelector('#missing-local-card').hidden = resultView || !missingLocalCard;
   const target = shared ?? document.getElementById(id);
-  const single = target?.parentElement === cards;
+  const single = !resultView && target?.parentElement === cards;
   const stockDetail = single && context?.[1]==='bestand-lagerort';
   cards.classList.toggle('stock-detail',stockDetail);
-  const returnPage = single ? context?.[1] : null;
+  const returnPage = resultView ? 'filament-scannen' : single ? context?.[1] : null;
   if (returnPage) {
     back.href = '#'+returnPage;
     back.textContent = '← '+pageTitles[returnPage];
@@ -1477,14 +1483,14 @@ function filter() {
   const printersView = route==='meine-drucker';
   const backupView = route==='datensicherung';
   const dryingView = Boolean(dryingDashboard && route==='trocknung');
-  const home = !single && !locationsView && !inventoryView && !createView && !scanningView && !printersView && !backupView && !dryingView && !missingLocalCard;
+  const home = !single && !locationsView && !inventoryView && !createView && !scanningView && !printersView && !backupView && !dryingView && !missingLocalCard && !resultView;
   printerView.hidden = !printersView;
   if (printersView) renderPrinters();
   menu.hidden = !home;
   overview.hidden = !inventoryView;
   const heading = single ? target.querySelector('h2') : null;
   const title = heading ? [heading.textContent,target.dataset.color ?? target.querySelector('.label')?.textContent].filter(Boolean).join(' · ')
-    : missingLocalCard ? 'Filamentkarte' : createView && editing ? 'Filament bearbeiten' : pageTitles[route] ?? 'Hauptmenü';
+    : resultView ? 'Filament im Überblick' : missingLocalCard ? 'Filamentkarte' : createView && editing ? 'Filament bearbeiten' : pageTitles[route] ?? 'Hauptmenü';
   if (pageNavigation) pageNavigation.hidden = home;
   pageTitle.hidden = Boolean(heading);
   pageTitle.parentElement.hidden = Boolean(heading);
@@ -1502,6 +1508,8 @@ function filter() {
   filamentEditor.hidden = !createView;
   filamentEditor.open = createView;
   scanView.hidden = !scanningView;
+  scanResult.hidden = !resultView;
+  if (resultView) renderScanResult(target?.parentElement===cards ? target : null,id);
   document.querySelector('#datensicherung').hidden = !backupView;
   if (dryingDashboard) dryingDashboard.hidden = !dryingView;
   if (dryingView) renderDryingDashboard();
@@ -1645,6 +1653,124 @@ updateColorPalette();
 const cardSave = document.querySelector('#card-save');
 const filamentEditor = form.closest('details');
 const scanView = document.querySelector('#scan-view');
+const scanResultPrefix = 'scan-ergebnis/';
+const scanResult = element('section','');
+scanResult.id = 'scan-ergebnis';
+scanResult.setAttribute('aria-labelledby','page-title');
+scanResult.hidden = true;
+scanView.after(scanResult);
+function scanSpecs(card, tests) {
+  const list = element('dl','');
+  const manufacturer = [...card.querySelectorAll('dl dt')].filter(field=>tests.some(test=>test.test(field.textContent)));
+  for (const field of manufacturer) {
+    const row = field.parentElement.cloneNode(true);
+    list.append(row);
+  }
+  return list;
+}
+function scanSavedProfiles(card) {
+  const section = element('section','');
+  const printer = element('select','');
+  const nozzle = element('select','');
+  const printers = readPrinters();
+  for (const item of printers) printer.add(new Option(item.name,item.id));
+  const fields = element('div','');
+  fields.className = 'fields';
+  for (const [name,input] of [['Drucker',printer],['Düse',nozzle]]) {
+    const label = element('label',name);
+    label.append(input);
+    fields.append(label);
+  }
+  const values = element('div','');
+  function renderValues() {
+    const profile = readSavedPrintProfile(card.id,printer.value,nozzle.value);
+    let order = [];
+    try {
+      const saved = JSON.parse(profile.__reihenfolge);
+      if (Array.isArray(saved)) order = saved;
+    } catch {}
+    const names = [...new Set([...order,...Object.keys(printProfileLabels),...Object.keys(profile)])];
+    const list = element('dl','');
+    for (const name of names) {
+      const title = Object.hasOwn(printProfileLabels,name) ? printProfileLabels[name] : typeof name==='string' && name.startsWith('eigen:') ? name.slice(6) : '';
+      if (!title || typeof profile[name]!=='string' || !profile[name].trim()) continue;
+      const row = element('div','');
+      row.append(element('dt',title),element('dd',profile[name]));
+      list.append(row);
+    }
+    values.replaceChildren(list.children.length ? list : element('p','Für diese Düse sind noch keine eigenen Druckwerte gespeichert.'));
+  }
+  printer.onchange = () => {
+    const selected = printers.find(item=>item.id===printer.value);
+    nozzle.replaceChildren(...printerNozzles(selected).map(item=>new Option(nozzleName(selected,item.position)+(item.diameter?' · '+item.diameter+' mm':''),item.id)));
+    renderValues();
+  };
+  nozzle.onchange = renderValues;
+  section.append(element('h2','Eigene Druckwerte'),fields,values);
+  printer.onchange();
+  return section;
+}
+function renderScanResult(card,id) {
+  const again = element('button','Erneut scannen');
+  again.type = 'button';
+  again.onclick = () => {
+    history.pushState(null,'','#filament-scannen');
+    filter();
+    window.scrollTo(0,0);
+    scanOpen.click();
+  };
+  if (!card) {
+    scanResult.replaceChildren(element('p','Diese Filamentkarte ist in diesem Browser nicht verfügbar. Falls sie zu deinem eigenen Bestand gehört, kannst du deine Datensicherung importieren.'),again);
+    return;
+  }
+  const name = card.querySelector('h2').textContent;
+  const color = card.dataset.color ?? card.querySelector('.label')?.textContent;
+  const heading = element('div','');
+  heading.className = 'card-heading';
+  const swatch = card.querySelector('.card-heading .swatch')?.cloneNode(true);
+  if (swatch) heading.append(swatch);
+  heading.append(element('h2',[name,color].filter(Boolean).join(' · ')));
+  const actions = element('div','');
+  actions.className = 'scan-result-actions';
+  const full = element('a','Vollständige Filamentkarte öffnen');
+  full.href = '#'+id;
+  actions.append(again,full);
+  scanResult.replaceChildren(heading,actions);
+  const shared = card.hasAttribute('data-shared-filament');
+  if (shared) {
+    scanResult.append(element('p','Geteilte Momentaufnahme. Persönlicher Bestand und eigene Druckwerte sind hier nicht enthalten.'));
+  } else {
+    const stock = stockForCard(card.id);
+    const places = new Map(readLocations().map(place=>[place.id,place.name]));
+    const interval = readDryingIntervals()[card.id];
+    scanResult.append(element('h2','Bestand und Trocknung'));
+    const nominal = nominalWeight(card);
+    const totals = weightTotals(stock,nominal);
+    scanResult.append(element('p',[stock.length===1?'1 Rolle':stock.length+' Rollen',...totals].join(' · ')));
+    if (stock.length>1) scanResult.append(element('p','Der QR-Code gehört zur Filamentkarte. Vergleiche die Rollen unten.'));
+    const group = element('div','');
+    group.className = 'scan-rolls';
+    for (const [index,roll] of stock.entries()) {
+      const entry = element('article','');
+      const {state,last,due} = dryingSchedule(roll,interval);
+      const signal = element('span',dryingStates[state].label);
+      signal.className = 'drying-state';
+      signal.dataset.state = state;
+      const label = state==='open' ? 'Trocknung: Termin offen' : 'Trocknung: '+dryingStates[state].label;
+      signal.textContent = label;
+      entry.append(element('strong','Rolle '+(index+1)),element('p',[
+        places.get(roll.locationId) ?? 'Lagerort nicht angegeben',weightDescription(roll,nominal)
+      ].join(' · ')),signal);
+      if (last) entry.append(element('p','Zuletzt getrocknet: '+last.split('-').reverse().join('.')));
+      if (due!==null) entry.append(element('p','Geplant für: '+new Date(due).toISOString().slice(0,10).split('-').reverse().join('.')));
+      group.append(entry);
+    }
+    scanResult.append(group,scanSavedProfiles(card));
+  }
+  const specs = scanSpecs(card,[/Durchmesser/i,/Düsentemperatur|Drucktemperatur/i,/Druckbett/i,/^Trocknung/i]);
+  if (specs.children.length) scanResult.append(element('h2','Herstellerangaben'),specs);
+}
+
 document.querySelector('#new-filament').onclick = () => { clearEditor(); showCapture('menu'); status.textContent = ''; };
 function updateCardSave() {
   const savedCard = rolls.find(roll=>roll.id===editing);
@@ -2082,8 +2208,9 @@ function openScannedFilament(code) {
   if (address.origin!==location.origin || address.pathname.replace(/index\.html$/,'')!==basePath || !route) return false;
   if (!route.startsWith(sharedPrefix) && !/^eigene-rolle-[a-f0-9-]{36}$/i.test(route) && document.getElementById(route)?.parentElement!==cards) return false;
   closeScanner();
-  if (location.hash===address.hash) filter();
-  else location.hash = address.hash;
+  const result = '#'+scanResultPrefix+route;
+  if (location.hash===result) filter();
+  else location.hash = result;
   window.scrollTo(0,0);
   return true;
 }
