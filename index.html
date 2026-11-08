@@ -22,6 +22,7 @@ article:target > .open-roll{display:none}
 #filament-scanner{padding:.85rem;margin-bottom:1rem;border:1px solid #58716e;border-radius:.7rem}#scan-video{display:block;width:100%;max-height:18rem;object-fit:contain;background:#10161c;margin-bottom:.6rem}
 #main-menu a{background:#18242c}#main-menu a:hover,#main-menu a:focus-visible{background:#24443d}#scan-view>button{margin-bottom:.7rem}
 .custom-profile-editor{margin-top:.65rem}.custom-profile-row label{overflow-wrap:anywhere}
+.profile-fields{grid-template-columns:1fr}.profile-order-handle{touch-action:none;cursor:grab;min-width:2.75rem;font-size:1.15rem}.profile-dragging .profile-order-handle{cursor:grabbing}.profile-dragging{outline:1px dashed var(--mint);outline-offset:3px}
 </style>
 <main>
 <header><h1>Filamentlager</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -851,6 +852,102 @@ function prepareCard(card, color) {
   fields.lastElementChild.append(save,message);
   let baseline = saved;
   const inputs = [...fields.querySelectorAll('input')];
+  fields.classList.add('profile-fields');
+  const orderKey = '__reihenfolge';
+  const orderStatus = element('p','');
+  orderStatus.setAttribute('role','status');
+  const orderHelp = element('p','Ziehe am Griff, um ein Feld zu verschieben. Mit der Tastatur kannst du am Griff die Pfeiltasten verwenden.');
+  editor.insertBefore(orderHelp,fields);
+  editor.append(orderStatus);
+  const rowName = row => row.querySelector('input').name;
+  const fieldOrder = () => [...fields.children].map(rowName);
+  function applyFieldOrder(order) {
+    const rows = new Map([...fields.children].map(row=>[rowName(row),row]));
+    for (const name of order) {
+      if (rows.has(name)) { fields.append(rows.get(name)); rows.delete(name); }
+    }
+    for (const row of rows.values()) fields.append(row);
+  }
+  function loadFieldOrder(values) {
+    try {
+      const order = JSON.parse(values[orderKey] ?? '[]');
+      if (Array.isArray(order) && order.length) applyFieldOrder(order);
+      else applyFieldOrder(inputs.map(input=>input.name));
+    } catch { applyFieldOrder(inputs.map(input=>input.name)); }
+    orderStatus.textContent = '';
+  }
+  function saveFieldOrder(before) {
+    const order = JSON.stringify(fieldOrder());
+    if (order===JSON.stringify(before)) return;
+    try {
+      localStorage.setItem(profileStorageKey(),JSON.stringify({...readProfile(),[orderKey]:order}));
+      baseline = {...baseline,[orderKey]:order};
+      orderStatus.textContent = 'Reihenfolge gespeichert.';
+    } catch {
+      applyFieldOrder(before);
+      orderStatus.textContent = 'Die Reihenfolge konnte nicht gespeichert werden.';
+    }
+  }
+  let drag;
+  function moveAt(y) {
+    const target = [...fields.children].filter(row=>row!==drag.row).find(row=>{
+      const bounds = row.getBoundingClientRect();
+      return y < (bounds.top+bounds.bottom)/2;
+    });
+    if (target ? drag.row.nextElementSibling!==target : drag.row!==fields.lastElementChild) fields.insertBefore(drag.row,target ?? null);
+  }
+  function scrollWhileDragging() {
+    if (!drag) return;
+    const edge = 85;
+    const distance = drag.y < edge ? -12 : drag.y > window.innerHeight-edge ? 12 : 0;
+    if (distance) { window.scrollBy(0,distance); moveAt(drag.y); }
+    drag.frame = requestAnimationFrame(scrollWhileDragging);
+  }
+  function endDrag(event,commit) {
+    if (!drag || drag.pointer!==event.pointerId) return;
+    const {row,before,frame} = drag;
+    drag = null;
+    cancelAnimationFrame(frame);
+    row.classList.remove('profile-dragging');
+    if (commit) saveFieldOrder(before);
+    else applyFieldOrder(before);
+  }
+  fields.onpointermove = event => {
+    if (!drag || event.pointerId!==drag.pointer) return;
+    if (!drag.moved && Math.abs(event.clientY-drag.y)<5) return;
+    drag.moved = true;
+    drag.y = event.clientY;
+    moveAt(drag.y);
+  };
+  fields.onpointerup = event => endDrag(event,true);
+  fields.onpointercancel = fields.onlostpointercapture = event => endDrag(event,false);
+  function addOrderHandle(row) {
+    const handle = element('button','↕');
+    handle.type = 'button';
+    handle.className = 'profile-order-handle';
+    handle.setAttribute('aria-label',row.querySelector('label').textContent+' verschieben');
+    handle.title = 'Nach oben oder unten verschieben';
+    handle.onpointerdown = event => {
+      if (event.button!==0 || drag) return;
+      event.preventDefault();
+      fields.setPointerCapture(event.pointerId);
+      drag = {row,pointer:event.pointerId,y:event.clientY,before:fieldOrder(),moved:false};
+      row.classList.add('profile-dragging');
+      drag.frame = requestAnimationFrame(scrollWhileDragging);
+    };
+    handle.onkeydown = event => {
+      if (event.key!=='ArrowUp' && event.key!=='ArrowDown') return;
+      event.preventDefault();
+      const adjacent = event.key==='ArrowUp' ? row.previousElementSibling : row.nextElementSibling;
+      if (!adjacent) return;
+      const before = fieldOrder();
+      fields.insertBefore(row,event.key==='ArrowUp' ? adjacent : adjacent.nextElementSibling);
+      saveFieldOrder(before);
+      handle.focus();
+    };
+    row.prepend(handle);
+  }
+  for (const row of fields.children) addOrderHandle(row);
   const customPrefix = 'eigen:';
   function appendCustomField(name,value) {
     const row = element('div','');
@@ -862,6 +959,7 @@ function prepareCard(card, color) {
     input.value = value;
     label.append(input);
     row.append(label);
+    addOrderHandle(row);
     fields.append(row);
     return input;
   }
@@ -915,6 +1013,7 @@ function prepareCard(card, color) {
     if (event.key==='Enter') { event.preventDefault(); create.click(); }
   };
   renderCustomFields(saved);
+  loadFieldOrder(saved);
   function updateSaveButton() {
     const changed = [...fields.querySelectorAll('input')].some(input=>input.value!==(baseline[input.name] ?? '') || (input.name.startsWith(customPrefix) && !Object.hasOwn(baseline,input.name)));
     save.hidden = save.disabled = !changed;
@@ -940,6 +1039,7 @@ function prepareCard(card, color) {
     const values = drafts.get(profileStorageKey()) ?? baseline;
     for (const input of inputs) input.value = values[input.name] ?? '';
     renderCustomFields(values);
+    loadFieldOrder(baseline);
     nameInput.value = '';
     customStatus.textContent = '';
     customEditor.hidden = true;
@@ -953,6 +1053,8 @@ function prepareCard(card, color) {
     if (save.disabled) return;
     const values = Object.fromEntries(new FormData(editor));
     try {
+      const order = readProfile()[orderKey];
+      if (typeof order==='string') values[orderKey] = order;
       localStorage.setItem(profileStorageKey(),JSON.stringify(values));
       baseline = values;
       updateSaveButton();
