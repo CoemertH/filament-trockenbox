@@ -4,6 +4,8 @@ const form = document.querySelector('#form');
 const reset = document.querySelector('#reset');
 const status = document.querySelector('#status');
 const key = 'filament-trockenbox-rolls';
+const dryingIntervalKey = 'filament-trocknungsintervalle';
+const dryingActions = new WeakMap();
 const labels = {durchmesser:'Durchmesser',gewicht:'Gewicht',druck:'Drucktemperatur',trocknung:'Trocknung'};
 let rolls = [];
 let editing = null;
@@ -440,7 +442,7 @@ function addStockSection(card, profile) {
   function saveDrying(rollId, session) {
     const current = readStock();
     if (!current.some(item=>item.id===rollId)) return false;
-    const saved = saveStock(current.map(item=>item.id===rollId ? {...item,drying:[...(item.drying ?? []),session]} : item));
+    const saved = saveStock(current.map(item=>item.id===rollId ? {...item,drying:[...(item.drying ?? []),session],dryingDue:false} : item));
     if (saved) {
       dryingFeedback.textContent = 'Trocknung gespeichert.';
       dryingFeedback.hidden = false;
@@ -504,6 +506,14 @@ function addStockSection(card, profile) {
   };
   section.append(summary,element('p','Der Bestand wird in diesem Browser gespeichert. Gib das Restgewicht direkt ein oder wiege die komplette Rolle und trage das Leergewicht ein.'),tareForm,feedback,undo,entries);
   const location = addLocationSection(card,readStock,saveStock);
+  dryingActions.set(card,{
+    saveDrying,
+    markDue(rollId,dryingDue) {
+      const current = readStock();
+      if (!current.some(item=>item.id===rollId)) return false;
+      return saveStock(current.map(item=>item.id===rollId ? {...item,dryingDue} : item));
+    }
+  });
   profile.after(quickDrying,location.details,section);
   renderStock(readStock());
 }
@@ -1424,7 +1434,8 @@ function filter() {
   const scanningView = route==='filament-scannen';
   const printersView = route==='meine-drucker';
   const backupView = route==='datensicherung';
-  const home = !single && !locationsView && !inventoryView && !createView && !scanningView && !printersView && !backupView && !missingLocalCard;
+  const dryingView = Boolean(dryingDashboard && route==='trocknung');
+  const home = !single && !locationsView && !inventoryView && !createView && !scanningView && !printersView && !backupView && !dryingView && !missingLocalCard;
   printerView.hidden = !printersView;
   if (printersView) renderPrinters();
   menu.hidden = !home;
@@ -1436,6 +1447,8 @@ function filter() {
   filamentEditor.open = createView;
   scanView.hidden = !scanningView;
   document.querySelector('#datensicherung').hidden = !backupView;
+  if (dryingDashboard) dryingDashboard.hidden = !dryingView;
+  if (dryingView) renderDryingDashboard();
   if (locationsView) renderLocationOverview();
   const terms = normalizeSearch(search.value).split(' ').filter(Boolean);
   for (const card of cards.children) {
@@ -1653,7 +1666,7 @@ let incomingBackup = null;
 const backupPrefixes = ['filament-x2d:','filament-bestand:','filament-spulengewicht:'];
 const localCardPattern = /^eigene-rolle-[a-f0-9-]{36}$/i;
 function personalKey(name) {
-  if (name === key || name === locationKey || name === locationOrderKey || name === printerKey || name === nozzleVariantKey) return true;
+  if (name === key || name === locationKey || name === locationOrderKey || name === dryingIntervalKey || name === printerKey || name === nozzleVariantKey) return true;
   const printerProfile = name.match(/^filament-druckprofil:(?:x2d|[a-f0-9-]{36}):(?:[0-7]|[a-f0-9-]{36}):(.+)$/i);
   if (printerProfile) return personalKey('filament-x2d:'+printerProfile[1]);
   const prefix = backupPrefixes.find(value=>name.startsWith(value));
@@ -1669,7 +1682,9 @@ function validateBackup(data) {
     if (!personalKey(name) || !isText(raw)) throw Error();
     if (name.startsWith('filament-spulengewicht:')) { if (!decimal(raw)) throw Error(); continue; }
     const value = JSON.parse(raw);
-    if (name===locationOrderKey) {
+    if (name===dryingIntervalKey) {
+      if (!value || typeof value!=='object' || Array.isArray(value) || Object.values(value).some(days=>!validDryingInterval(days))) throw Error();
+    } else if (name===locationOrderKey) {
       if (!Array.isArray(value) || value.some(id=>!isText(id) || !id) || new Set(value).size!==value.length) throw Error();
     } else if (name===nozzleVariantKey) {
       if (!Array.isArray(value) || value.some(item=>!item || !/^[a-f0-9-]{36}$/i.test(item.id) || !/^(?:x2d|[a-f0-9-]{36})$/i.test(item.printerId) || !Number.isInteger(item.position) || item.position<0 || item.position>7 || !item.diameter || !validNozzle(item.diameter)) || new Set(value.map(item=>item.id)).size!==value.length) throw Error();
@@ -1681,7 +1696,7 @@ function validateBackup(data) {
       if (!Array.isArray(value) || value.some(item=>!item || !localCardPattern.test('eigene-rolle-'+item.id) || !isText(item.material) || !item.material.trim() || !isText(item.farbe) || !item.farbe.trim() || Object.values(item).some(field=>!isText(field)))) throw Error();
       if (new Set(value.map(item=>item.id)).size!==value.length) throw Error();
     } else if (name.startsWith('filament-bestand:')) {
-      if (!Array.isArray(value) || value.some(item=>!item || !isText(item.id) || !['unknown','opened','sealed'].includes(item.packaging) || !decimal(item.weight) || (item.locationId!==undefined && !isText(item.locationId)) || !decimal(item.gross??'') || !decimal(item.tare??'') || (item.drying!==undefined && (!Array.isArray(item.drying) || item.drying.some(session=>!validDryingSession(session)))) || (item.gross && (!item.tare && item.tare!=='0' || Number(item.gross)<Number(item.tare))))) throw Error();
+      if (!Array.isArray(value) || value.some(item=>!item || !isText(item.id) || !['unknown','opened','sealed'].includes(item.packaging) || !decimal(item.weight) || (item.locationId!==undefined && !isText(item.locationId)) || !decimal(item.gross??'') || !decimal(item.tare??'') || (item.dryingDue!==undefined && typeof item.dryingDue!=='boolean') || (item.drying!==undefined && (!Array.isArray(item.drying) || item.drying.some(session=>!validDryingSession(session)))) || (item.gross && (!item.tare && item.tare!=='0' || Number(item.gross)<Number(item.tare))))) throw Error();
       if (new Set(value.map(item=>item.id)).size!==value.length) throw Error();
     } else if (!value || typeof value!=='object' || Array.isArray(value) || Object.values(value).some(field=>!isText(field))) throw Error();
   }
@@ -1990,5 +2005,134 @@ printerForm.onsubmit = event => {
 };
 renderNozzleFields();
 
+const dryingStates = {
+  due:{label:'Fällig',rank:0},
+  soon:{label:'Bald fällig',rank:1},
+  planned:{label:'Eingeplant',rank:2},
+  open:{label:'Offen',rank:3}
+};
+const dayInMs = 86400000;
+function validDryingInterval(days) {
+  return Number.isInteger(days) && days>=1 && days<=3650;
+}
+function readDryingIntervals() {
+  try {
+    const value = JSON.parse(localStorage.getItem(dryingIntervalKey));
+    if (value && typeof value==='object' && !Array.isArray(value)) return value;
+  } catch {}
+  return {};
+}
+function dryingSchedule(roll,interval,today = new Date()) {
+  const last = (Array.isArray(roll.drying) ? roll.drying : []).filter(validDryingSession)
+    .reduce((latest,session)=>session.date>latest ? session.date : latest,'');
+  const currentDay = Date.UTC(today.getFullYear(),today.getMonth(),today.getDate());
+  const due = last && validDryingInterval(interval) ? Date.parse(last+'T00:00:00Z') + interval*dayInMs : null;
+  const days = due===null ? null : (due-currentDay)/dayInMs;
+  const state = roll.dryingDue || (days!==null && days<=0) ? 'due' : days===null ? 'open' : days<=3 ? 'soon' : 'planned';
+  return {state,last,due};
+}
+function renderDryingDashboard() {
+  const intervals = readDryingIntervals();
+  const places = new Map(readLocations().map(place=>[place.id,place.name]));
+  const items = [];
+  let sealed = 0;
+  for (const card of cards.querySelectorAll('article[id]')) {
+    for (const [index,roll] of stockForCard(card.id).entries()) {
+      if (roll.packaging==='sealed') {
+        sealed++;
+        if (!dryingSealed.checked) continue;
+      }
+      const interval = Object.hasOwn(intervals,card.id) && validDryingInterval(intervals[card.id]) ? intervals[card.id] : null;
+      const title = card.querySelector('h2').textContent+' · '+card.dataset.color;
+      items.push({card,roll,index,interval,title,...dryingSchedule(roll,interval)});
+    }
+  }
+  items.sort((a,b)=>dryingStates[a.state].rank-dryingStates[b.state].rank ||
+    (a.due ?? -Infinity)-(b.due ?? -Infinity) || a.title.localeCompare(b.title,'de') || a.index-b.index);
+  const dateLabel = date=>date.split('-').reverse().join('.');
+  function report(message) { dryingStatus.textContent = message; }
+  function intervalEditor(item) {
+    const settings = element('details','');
+    settings.append(element('summary',item.interval ? 'Intervall: '+item.interval+' Tage' : 'Intervall einstellen'));
+    const editor = element('form','');
+    editor.append(element('p','Das Intervall gilt für alle Rollen dieses Filaments. Lass das Feld leer, um es zu entfernen.'));
+    const label = element('label','Trocknungsintervall (Tage)');
+    const days = element('input','');
+    days.type = 'number';
+    days.min = '1';
+    days.max = '3650';
+    days.step = '1';
+    days.inputMode = 'numeric';
+    days.value = item.interval ?? '';
+    label.append(days);
+    editor.append(label,element('button','Intervall speichern'));
+    editor.onsubmit = event => {
+      event.preventDefault();
+      const value = days.valueAsNumber;
+      if (days.value && !validDryingInterval(value)) return;
+      const next = readDryingIntervals();
+      if (days.value) next[item.card.id] = value;
+      else delete next[item.card.id];
+      try { localStorage.setItem(dryingIntervalKey,JSON.stringify(next)); }
+      catch { report('Das Intervall konnte nicht gespeichert werden.'); return; }
+      renderDryingDashboard();
+      report(days.value ? 'Intervall gespeichert.' : 'Intervall entfernt.');
+    };
+    settings.append(editor);
+    return settings;
+  }
+  const entries = items.map(item=>{
+    const {card,roll,index,title,state,last,due} = item;
+    const view = element('article','');
+    view.className = 'drying-dashboard-card';
+    const heading = element('h3','');
+    const link = element('a',title);
+    link.href = '#'+card.id;
+    heading.append(link);
+    const signal = element('span',dryingStates[state].label);
+    signal.className = 'drying-state';
+    signal.dataset.state = state;
+    view.append(heading,element('p','Rolle '+(index+1)+' · '+(places.get(roll.locationId) ?? 'Lagerort nicht angegeben')),signal);
+    view.append(element('p',last ? 'Zuletzt getrocknet: '+dateLabel(last) : 'Letzte Trocknung unbekannt'));
+    if (due!==null) view.append(element('p','Geplanter Termin: '+dateLabel(new Date(due).toISOString().slice(0,10))));
+    if (roll.dryingDue) view.append(element('p','Manuell als fällig markiert.'));
+    if (roll.packaging==='sealed') view.append(element('p','Originalverpackt'));
+    const recommendations = [...card.querySelectorAll('.drying-quick > ul > li')];
+    if (recommendations.length===1) view.append(element('p','Empfehlung: '+recommendations[0].textContent));
+    else if (recommendations.length>1) {
+      const details = element('details','');
+      const list = element('ul','');
+      for (const recommendation of recommendations) list.append(element('li',recommendation.textContent));
+      details.append(element('summary','Trocknungsempfehlungen'),list);
+      view.append(details);
+    } else view.append(element('p','Keine Trocknungsempfehlung hinterlegt.'));
+    const history = dryingHistory(roll,session=>{
+      const saved = dryingActions.get(card)?.saveDrying(roll.id,session);
+      if (saved) report('Trocknung gespeichert. Die Ampel wurde aktualisiert.');
+      return saved;
+    });
+    history.querySelector('summary').textContent = 'Trocknung erfassen';
+    const actions = element('div','');
+    actions.className = 'drying-actions';
+    const mark = element('button',roll.dryingDue ? 'Manuelle Markierung entfernen' : 'Als fällig markieren');
+    mark.type = 'button';
+    mark.onclick = () => {
+      const saved = dryingActions.get(card)?.markDue(roll.id,!roll.dryingDue);
+      report(saved ? (roll.dryingDue ? 'Manuelle Markierung entfernt.' : 'Rolle als fällig markiert.') : 'Die Markierung konnte nicht gespeichert werden.');
+    };
+    actions.append(mark);
+    view.append(history,intervalEditor(item),actions);
+    return view;
+  });
+  if (!dryingSealed.checked && sealed) entries.push(element('p',sealed+(sealed===1?' originalverpackte Rolle ausgeblendet.':' originalverpackte Rollen ausgeblendet.')));
+  if (!items.length) entries.unshift(element('p','Keine Rollen für diese Auswahl vorhanden.'));
+  dryingRolls.replaceChildren(...entries);
+}
+
+const dryingDashboard = document.querySelector('#trocknung');
+const dryingSealed = document.querySelector('#drying-show-sealed');
+const dryingRolls = document.querySelector('#drying-dashboard-rolls');
+const dryingStatus = document.querySelector('#drying-dashboard-status');
+if (dryingSealed) dryingSealed.onchange = () => renderDryingDashboard();
 search.oninput = filter;
 render();
