@@ -752,6 +752,21 @@ function nozzleName(printer,index) {
   if (printer.id==='x2d') return index===0 ? 'Hauptdüse' : 'Nebendüse';
   return printer.diameters.length===1 ? 'Düse' : 'Düse '+(index+1);
 }
+const nozzleVariantKey = 'filament-duesenvarianten';
+function readNozzleVariants() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(nozzleVariantKey));
+    if (Array.isArray(saved)) return saved;
+  } catch {}
+  return [];
+}
+function printerNozzles(printer) {
+  const variants = readNozzleVariants().filter(item=>item.printerId===printer.id);
+  return printer.diameters.flatMap((diameter,index)=>[
+    {id:String(index),position:index,diameter},
+    ...variants.filter(item=>item.position===index)
+  ]);
+}
 function prepareCard(card, color) {
   const title = card.querySelector('h2').textContent;
   card.dataset.material = title.match(/Stützmaterial|PLA\+|PETG|ABS|PLA/i)?.[0] ?? title;
@@ -789,18 +804,19 @@ function prepareCard(card, color) {
   editor.append(choice);
   const drafts = new Map();
   let activePrinter = x2d;
-  let activeNozzle = 0;
+  let activeNozzle = '0';
   function refreshPrinterOptions() {
     printerSelect.replaceChildren(...readPrinters().map(printer=>new Option(printer.name,printer.id)));
     printerSelect.value = activePrinter.id;
   }
   function refreshNozzleOptions() {
-    nozzle.replaceChildren(...activePrinter.diameters.map((diameter,index)=>new Option(nozzleName(activePrinter,index)+(diameter?' · '+diameter+' mm':''),String(index))));
-    nozzle.value = String(activeNozzle);
-    nozzleLabel.hidden = activePrinter.diameters.length===1;
+    const options = printerNozzles(activePrinter);
+    nozzle.replaceChildren(...options.map(item=>new Option(nozzleName(activePrinter,item.position)+(item.diameter?' · '+item.diameter+' mm':''),item.id)));
+    nozzle.value = activeNozzle;
+    nozzleLabel.hidden = options.length===1;
   }
   function profileStorageKey() {
-    if (activePrinter.id==='x2d') return 'filament-x2d:'+card.id+(activeNozzle===1?':secondary':'');
+    if (activePrinter.id==='x2d' && (activeNozzle==='0' || activeNozzle==='1')) return 'filament-x2d:'+card.id+(activeNozzle==='1'?':secondary':'');
     return 'filament-druckprofil:'+activePrinter.id+':'+activeNozzle+':'+card.id;
   }
   function readProfile() {
@@ -809,7 +825,7 @@ function prepareCard(card, color) {
   }
   refreshPrinterOptions();
   refreshNozzleOptions();
-  card.addEventListener('printers-changed',refreshPrinterOptions);
+  card.addEventListener('printers-changed',() => { refreshPrinterOptions(); refreshNozzleOptions(); });
   const saved = readProfile();
   for (const [name,label] of Object.entries({duese:'Düsentemperatur (°C)',platte:'Druckplatte',bett:'Druckbett (°C)',fluss:'Maximaler Volumenstrom (mm³/s)',kWert:'K-Wert',flussverhaeltnis:'Flussverhältnis',notiz:'Notizen'})) {
     const field = element('label',label);
@@ -860,8 +876,8 @@ function prepareCard(card, color) {
     for (const input of inputs) input.value = values[input.name] ?? '';
     onProfileEdit();
   }
-  printerSelect.onchange = () => switchProfile(readPrinters().find(printer=>printer.id===printerSelect.value) ?? x2d,0);
-  nozzle.onchange = () => switchProfile(activePrinter,Number(nozzle.value));
+  printerSelect.onchange = () => switchProfile(readPrinters().find(printer=>printer.id===printerSelect.value) ?? x2d,'0');
+  nozzle.onchange = () => switchProfile(activePrinter,nozzle.value);
   editor.onsubmit = event => {
     event.preventDefault();
     if (save.disabled) return;
@@ -1456,8 +1472,8 @@ let incomingBackup = null;
 const backupPrefixes = ['filament-x2d:','filament-bestand:','filament-spulengewicht:'];
 const localCardPattern = /^eigene-rolle-[a-f0-9-]{36}$/i;
 function personalKey(name) {
-  if (name === key || name === locationKey || name === printerKey) return true;
-  const printerProfile = name.match(/^filament-druckprofil:[a-f0-9-]{36}:[0-7]:(.+)$/i);
+  if (name === key || name === locationKey || name === printerKey || name === nozzleVariantKey) return true;
+  const printerProfile = name.match(/^filament-druckprofil:(?:x2d|[a-f0-9-]{36}):(?:[0-7]|[a-f0-9-]{36}):(.+)$/i);
   if (printerProfile) return personalKey('filament-x2d:'+printerProfile[1]);
   const prefix = backupPrefixes.find(value=>name.startsWith(value));
   if (!prefix) return false;
@@ -1472,7 +1488,9 @@ function validateBackup(data) {
     if (!personalKey(name) || !isText(raw)) throw Error();
     if (name.startsWith('filament-spulengewicht:')) { if (!decimal(raw)) throw Error(); continue; }
     const value = JSON.parse(raw);
-    if (name===printerKey) {
+    if (name===nozzleVariantKey) {
+      if (!Array.isArray(value) || value.some(item=>!item || !/^[a-f0-9-]{36}$/i.test(item.id) || !/^(?:x2d|[a-f0-9-]{36})$/i.test(item.printerId) || !Number.isInteger(item.position) || item.position<0 || item.position>7 || !item.diameter || !validNozzle(item.diameter)) || new Set(value.map(item=>item.id)).size!==value.length) throw Error();
+    } else if (name===printerKey) {
       if (!Array.isArray(value) || value.some(item=>!item || !/^[a-f0-9-]{36}$/i.test(item.id) || !isText(item.name) || !item.name.trim() || item.name.length>80 || !Array.isArray(item.diameters) || item.diameters.length<1 || item.diameters.length>8 || item.diameters.some(value=>!validNozzle(value))) || new Set(value.map(item=>item.id)).size!==value.length) throw Error();
     } else if (name===locationKey) {
       if (!Array.isArray(value) || value.some(item=>!item || !isText(item.id) || !isText(item.name) || !item.name.trim() || item.name.length>60) || new Set(value.map(item=>item.id)).size!==value.length) throw Error();
@@ -1490,7 +1508,7 @@ function backupPlan(records) {
   const changes = [];
   for (const [name,value] of Object.entries(records)) {
     const before = localStorage.getItem(name);
-    if (name!==key && name!==locationKey && name!==printerKey) {
+    if (name!==key && name!==locationKey && name!==printerKey && name!==nozzleVariantKey) {
       if (before!==value) changes.push({name,before,value,conflict:before!==null});
       continue;
     }
@@ -1538,8 +1556,8 @@ document.querySelector('#backup-import').onclick = () => {
   const written = [];
   try {
     const plan = backupPlan(incomingBackup).filter(item=>!item.conflict || backupConflict.value==='replace');
-    const writes = plan.filter(item=>item.name!==key && item.name!==locationKey && item.name!==printerKey);
-    for (const name of [key,locationKey,printerKey]) {
+    const writes = plan.filter(item=>item.name!==key && item.name!==locationKey && item.name!==printerKey && item.name!==nozzleVariantKey);
+    for (const name of [key,locationKey,printerKey,nozzleVariantKey]) {
       const importedItems = plan.filter(item=>item.name===name);
       if (!importedItems.length) continue;
       const before = localStorage.getItem(name);
@@ -1701,8 +1719,47 @@ function renderPrinters() {
     const entry = element('article','');
     entry.append(element('h3',printer.name));
     const list = element('ul','');
-    printer.diameters.forEach((diameter,index)=>list.append(element('li',nozzleName(printer,index)+(diameter?' · '+diameter+' mm':''))));
+    for (const item of printerNozzles(printer)) list.append(element('li',nozzleName(printer,item.position)+(item.diameter?' · '+item.diameter+' mm':'')));
     entry.append(list);
+    const edit = element('details','');
+    edit.append(element('summary','Drucker bearbeiten'));
+    const form = element('form','');
+    const fields = element('div','');
+    fields.className = 'fields';
+    const positionLabel = element('label','Düsenposition');
+    const position = element('select','');
+    printer.diameters.forEach((_,index)=>position.add(new Option(nozzleName(printer,index),String(index))));
+    positionLabel.append(position);
+    const diameterLabel = element('label','Neuer Durchmesser in mm');
+    const diameter = element('input','');
+    diameter.inputMode = 'decimal';
+    diameter.placeholder = '0,6';
+    diameter.required = true;
+    diameter.maxLength = 8;
+    diameterLabel.append(diameter);
+    fields.append(positionLabel,diameterLabel);
+    const save = element('button','Düsenvariante hinzufügen');
+    const feedback = element('p','');
+    feedback.setAttribute('role','status');
+    form.append(fields,save,feedback);
+    form.onsubmit = event => {
+      event.preventDefault();
+      const value = diameter.value.trim();
+      const index = Number(position.value);
+      if (!value || !validNozzle(value)) { feedback.textContent = 'Gib einen gültigen Durchmesser ein.'; return; }
+      const number = Number(value.replace(',','.'));
+      const duplicate = printerNozzles(printer).some(item=>item.position===index && Number(item.diameter.replace(',','.'))===number);
+      if (duplicate) { feedback.textContent = 'Diesen Durchmesser gibt es für diese Position bereits.'; return; }
+      const added = {id:crypto.randomUUID(),printerId:printer.id,position:index,diameter:String(number).replace('.',',')};
+      try { localStorage.setItem(nozzleVariantKey,JSON.stringify([...readNozzleVariants(),added])); }
+      catch { feedback.textContent = 'Die Düsenvariante konnte nicht gespeichert werden.'; return; }
+      for (const card of cards.children) card.dispatchEvent(new Event('printers-changed'));
+      renderPrinters();
+      printerStatus.textContent = 'Düsenvariante gespeichert.';
+    };
+    edit.append(form);
+    entry.append(edit);
+
     printerList.append(entry);
   }
 }
