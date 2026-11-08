@@ -256,6 +256,32 @@ function addLocationSection(card, readStock, saveStock) {
   refreshAssignments();
   return {details,refreshAssignments};
 }
+function dryingRecommendations(card) {
+  if (Object.hasOwn(dryingByDevice,card.id)) return dryingByDevice[card.id];
+  const values = [...card.querySelectorAll('dl dt')]
+    .filter(field=>field.textContent.startsWith('Trocknung'))
+    .map(field=>field.nextElementSibling?.textContent.trim())
+    .filter(value=>value && value!=='Nicht angegeben');
+  if (values.length===2 && card.id.startsWith('sunlu-pla-plus-')) values.push('Gerät nicht angegeben');
+  return values.length ? [values.join(' · ')] : [];
+}
+function createDryingSection(card) {
+  const section = element('details','');
+  section.className = 'drying-quick';
+  const recommendations = dryingRecommendations(card);
+  const value = recommendations[0] ?? '';
+  const temperature = value.match(/\d+(?:[,.]\d+)?(?:\s*[–-]\s*\d+(?:[,.]\d+)?)?\s*°C/i)?.[0];
+  const duration = value.match(/(?:mindestens\s+)?\d+(?:[,.]\d+)?(?:\s*[–-]\s*\d+(?:[,.]\d+)?)?\s*(?:Stunden?|Std\.?|h\b|Minuten?|Min\.?)/i)?.[0];
+  const preview = recommendations.length>1 ? 'je nach Gerät' : [temperature,duration].filter(Boolean).join(' · ');
+  section.append(element('summary','Trocknung'+(preview ? ' · '+preview : '')));
+  section.append(element('p','Herstellerempfehlung'));
+  if (recommendations.length) {
+    const list = element('ul','');
+    for (const recommendation of recommendations) list.append(element('li',recommendation));
+    section.append(list);
+  } else section.append(element('p','Keine Trocknungsempfehlung hinterlegt.'));
+  return section;
+}
 function addStockSection(card, profile) {
   const section = element('details','');
   section.className = 'stock';
@@ -263,6 +289,12 @@ function addStockSection(card, profile) {
   const entries = element('div','');
   const feedback = element('p','');
   feedback.setAttribute('role','status');
+  const quickDrying = createDryingSection(card);
+  const dryingEntries = element('div','');
+  const dryingFeedback = element('p','');
+  dryingFeedback.setAttribute('role','status');
+  dryingFeedback.hidden = true;
+  quickDrying.append(element('p','Meine Rollen'),dryingEntries,dryingFeedback);
   const storageKey = 'filament-bestand:' + card.id;
   const tareKey = 'filament-spulengewicht:' + card.id;
   let defaultTare = '';
@@ -405,6 +437,16 @@ function addStockSection(card, profile) {
     }
     return editor;
   }
+  function saveDrying(rollId, session) {
+    const current = readStock();
+    if (!current.some(item=>item.id===rollId)) return false;
+    const saved = saveStock(current.map(item=>item.id===rollId ? {...item,drying:[...(item.drying ?? []),session]} : item));
+    if (saved) {
+      dryingFeedback.textContent = 'Trocknung gespeichert.';
+      dryingFeedback.hidden = false;
+    }
+    return saved;
+  }
   function renderStock(stock, savedRollId) {
     const parts = ['Bestand: ' + stock.length + (stock.length===1 ? ' Rolle' : ' Rollen')];
     for (const [status,label] of [['sealed','originalverpackt'],['opened','angebrochen']]) {
@@ -441,14 +483,18 @@ function addStockSection(card, profile) {
     const rows = stock.map((roll,index)=>{
       const row = element('div','');
       row.className = 'stock-roll-entry';
-      row.append(stockForm(roll,index,savedRollId),dryingHistory(roll, session=>{
-        const current = readStock();
-        if (!current.some(item=>item.id===roll.id)) return false;
-        return saveStock(current.map(item=>item.id===roll.id ? {...item,drying:[...(item.drying ?? []),session]} : item));
-      }));
+      row.append(stockForm(roll,index,savedRollId),dryingHistory(roll,session=>saveDrying(roll.id,session)));
       return row;
     });
     entries.replaceChildren(...rows,add,draft);
+    dryingEntries.replaceChildren(...stock.map((roll,index)=>{
+      const history = dryingHistory(roll,session=>saveDrying(roll.id,session));
+      const title = history.querySelector('summary');
+      const latest = title.textContent.startsWith('Zuletzt getrocknet') ? ' · '+title.textContent : '';
+      title.textContent = 'Rolle '+(index+1)+' · Trocknung erfassen'+latest;
+      return history;
+    }));
+    if (!stock.length) dryingEntries.append(element('p','Keine Rollen im Bestand.'));
   }
   undo.onclick = () => {
     if (!removed || !saveStock([...readStock(),removed])) return;
@@ -458,7 +504,7 @@ function addStockSection(card, profile) {
   };
   section.append(summary,element('p','Der Bestand wird in diesem Browser gespeichert. Gib das Restgewicht direkt ein oder wiege die komplette Rolle und trage das Leergewicht ein.'),tareForm,feedback,undo,entries);
   const location = addLocationSection(card,readStock,saveStock);
-  profile.after(location.details,section);
+  profile.after(quickDrying,location.details,section);
   renderStock(readStock());
 }
 const printerKey = 'filament-drucker';
@@ -827,8 +873,7 @@ for (const card of cards.querySelectorAll('article[id]')) {
   }
   if (drying.length !== 2) continue;
   drying[0].querySelector('dt').textContent = 'Trocknung nach Gerät';
-  const existingDrying = drying.map(field => field.querySelector('dd').textContent).join(' · ');
-  const values = dryingByDevice[card.id] ?? [existingDrying + (card.id.startsWith('sunlu-pla-plus-') ? ' · Gerät nicht angegeben' : '')];
+  const values = dryingRecommendations(card);
   const list = element('ul','');
   const sources = [...manufacturer.querySelectorAll('p:not(.product-link) a[href]')];
   for (const value of values) {
@@ -1348,7 +1393,9 @@ function sharedCardFor(route) {
       item.append(element('dt',title),element('dd',roll[field] || 'Nicht angegeben'));
       specs.append(item);
     }
-    card.append(ownManufacturer(specs,roll.produktseite));
+    const manufacturer = ownManufacturer(specs,roll.produktseite);
+    card.append(manufacturer);
+    manufacturer.before(createDryingSection(card));
   } catch { card.append(element('h2','Filamentlink ungültig'),element('p','Der Link ist unvollständig oder enthält ungültige Filamentdaten.')); }
   cards.append(card);
   return card;
