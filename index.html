@@ -16,6 +16,7 @@ article:target > .open-roll{display:none}
 .location-remove-button{display:block;margin-top:.55rem}.location-create-row{display:grid;grid-template-columns:minmax(0,auto) minmax(0,1fr);align-items:start;gap:.55rem}.location-create-row>button{margin:0;max-width:8.5rem;white-space:normal}.location-create-row>.location-form{min-width:0;padding:0;border:0;background:transparent;margin:0}.location-create-row .stock-weight-save{display:grid;gap:.4rem}.location-create-row .stock-weight-save button{justify-self:start}
 #main-menu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-bottom:1.1rem}#main-menu a{display:block;text-align:center;padding:.65rem .45rem;border:1px solid #58716e;border-radius:.6rem;font-weight:700;text-decoration:none}#main-menu a[aria-current=page]{background:var(--mint);color:#112820}.location-stock-group{background:#18242c;border:1px solid #38514f;border-radius:.8rem;padding:.75rem 1rem;margin:.7rem 0}.location-stock-group h3,.location-stock-group ul,.location-stock-group p{margin:.35rem 0}.location-stock-group li+li{margin-top:.25rem}
 .stock-detail>article>:not(.card-heading):not(.locations):not(.stock){display:none!important}.stock-cancel{margin-inline-start:.5rem}
+.stock-move-choice{display:none}.selecting-stock .stock-move-choice{display:flex;align-items:baseline;gap:.55rem;margin:.45rem 0}.stock-move-choice input{width:auto;flex:none}.stock-transfer button:disabled{opacity:.55;cursor:default}
 </style>
 <main>
 <header><h1>Filamentlager</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -915,25 +916,150 @@ function stockForCard(cardId) {
   } catch {}
   return [{id:'erste-rolle',packaging:'unknown',weight:''}];
 }
-function renderLocationOverview() {
+function renderLocationOverview(message = '') {
   const groups = new Map(readLocations().map(place=>[place.id,{name:place.name,items:[]}]));
   const unassigned = {name:'Nicht angegeben',items:[]};
   for (const card of cards.children) {
     const title = card.querySelector('h2').textContent+' · '+card.dataset.color;
     const weightField = [...card.querySelectorAll('dl dt')].find(field=>['Filamentgewicht','Gewicht'].includes(field.textContent));
     const nominal = weightField?.nextElementSibling?.textContent.trim();
-    for (const roll of stockForCard(card.id)) {
+    for (const [index,roll] of stockForCard(card.id).entries()) {
       const group = groups.get(roll.locationId) ?? unassigned;
-      group.items.push({id:card.id,title,nominal,weight:roll.weight});
+      group.items.push({id:card.id,title,nominal,weight:roll.weight,rollId:roll.id,index,locationId:roll.locationId ?? ''});
     }
   }
-  locationGroups.replaceChildren();
+  const selected = new Map();
+  const checkboxes = [];
+  const transfer = element('form','');
+  transfer.className = 'stock-transfer';
+  transfer.hidden = true;
+  const toggle = element('button','Rollen umlagern');
+  toggle.type = 'button';
+  toggle.setAttribute('aria-expanded','false');
+  const status = element('p','');
+  status.setAttribute('role','status');
+  const destinationLabel = element('label','Neuer Lagerort');
+  const destination = element('select','');
+  destination.required = true;
+  destination.add(new Option('Ziel auswählen',''));
+  destination.add(new Option('Nicht angegeben','unassigned'));
+  for (const place of readLocations()) destination.add(new Option(place.name,'id:'+place.id));
+  destination.add(new Option('Neuen Lagerort erstellen','create'));
+  destinationLabel.append(destination);
+  const newLabel = element('label','Name des neuen Lagerorts');
+  const newName = element('input','');
+  newName.maxLength = 60;
+  newLabel.hidden = true;
+  newLabel.append(newName);
+  const save = element('button','Änderung speichern');
+  const selectedCount = element('p','0 Rollen ausgewählt');
+  const controls = element('div','');
+  controls.className = 'fields';
+  controls.append(destinationLabel,newLabel);
+  transfer.append(selectedCount,controls,save);
+  function refreshSelection() {
+    selectedCount.textContent = selected.size+(selected.size===1?' Rolle ausgewählt':' Rollen ausgewählt');
+    save.disabled = !selected.size || !destination.value || (destination.value==='create'&&!newName.value.trim());
+  }
+  destination.onchange = () => {
+    newLabel.hidden = destination.value!=='create';
+    newName.required = !newLabel.hidden;
+    refreshSelection();
+  };
+  newName.oninput = refreshSelection;
+  toggle.onclick = () => {
+    transfer.hidden = !transfer.hidden;
+    toggle.textContent = transfer.hidden ? 'Rollen umlagern' : 'Auswahl beenden';
+    toggle.setAttribute('aria-expanded',String(!transfer.hidden));
+    locationGroups.classList.toggle('selecting-stock',!transfer.hidden);
+    if (transfer.hidden) {
+      selected.clear();
+      for (const item of checkboxes) { item.box.checked = false; item.box.indeterminate = false; }
+    }
+    status.textContent = '';
+    refreshSelection();
+  };
+  function checkbox(labelText, items) {
+    const label = element('label',labelText);
+    label.className = 'stock-move-choice';
+    const box = element('input','');
+    box.type = 'checkbox';
+    label.prepend(box);
+    box.onchange = () => {
+      for (const item of items) {
+        const key = JSON.stringify([item.id,item.rollId]);
+        if (box.checked) selected.set(key,item);
+        else selected.delete(key);
+      }
+      for (const entry of checkboxes) {
+        const count = entry.items.filter(item=>selected.has(JSON.stringify([item.id,item.rollId]))).length;
+        entry.box.checked = count===entry.items.length;
+        entry.box.indeterminate = count>0&&count<entry.items.length;
+      }
+      refreshSelection();
+    };
+    checkboxes.push({box,items});
+    return label;
+  }
+  transfer.onsubmit = event => {
+    event.preventDefault();
+    if (save.disabled) return;
+    const places = readLocations();
+    const newPlace = destination.value==='create' ? {id:crypto.randomUUID(),name:newName.value.trim()} : null;
+    const targetId = newPlace?.id ?? (destination.value==='unassigned' ? '' : destination.value.slice(3));
+    if (newPlace && places.some(place=>place.name.toLocaleLowerCase('de')===newPlace.name.toLocaleLowerCase('de'))) {
+      status.textContent = 'Diesen Lagerort gibt es bereits.';
+      return;
+    }
+    if (!newPlace && targetId && !places.some(place=>place.id===targetId)) {
+      status.textContent = 'Dieser Lagerort ist nicht mehr vorhanden. Öffne die Lagerortübersicht erneut.';
+      return;
+    }
+    const changes = new Map();
+    let moved = 0;
+    for (const item of selected.values()) {
+      if (!changes.has(item.id)) changes.set(item.id,stockForCard(item.id));
+      const stock = changes.get(item.id);
+      const index = stock.findIndex(roll=>roll.id===item.rollId);
+      if (index<0 || (stock[index].locationId ?? '')!==item.locationId) {
+        status.textContent = 'Der Bestand hat sich geändert. Öffne die Lagerortübersicht erneut.';
+        return;
+      }
+      if (item.locationId===targetId) continue;
+      stock[index] = {...stock[index],locationId:targetId};
+      moved++;
+    }
+    if (!moved) { status.textContent = 'Die ausgewählten Rollen sind bereits an diesem Lagerort.'; return; }
+    const written = [];
+    try {
+      for (const [id,stock] of changes) {
+        const key = 'filament-bestand:'+id;
+        const before = localStorage.getItem(key);
+        localStorage.setItem(key,JSON.stringify(stock));
+        written.push({key,before});
+      }
+      if (newPlace) localStorage.setItem(locationKey,JSON.stringify([...places,newPlace]));
+    } catch {
+      for (const {key,before} of written.reverse()) {
+        try { if (before===null) localStorage.removeItem(key); else localStorage.setItem(key,before); } catch {}
+      }
+      status.textContent = 'Die Umlagerung konnte nicht gespeichert werden.';
+      return;
+    }
+    for (const card of cards.children) card.dispatchEvent(new Event('locations-changed'));
+    renderLocationOverview(moved===1?'1 Rolle umgelagert.':moved+' Rollen umgelagert.');
+  };
+  status.textContent = message;
+  locationGroups.classList.remove('selecting-stock');
+  locationGroups.replaceChildren(toggle,transfer,status);
+  refreshSelection();
   if (unassigned.items.length) groups.set('',unassigned);
   for (const {name,items} of groups.values()) {
     const group = element('section','');
     group.className = 'location-stock-group';
     group.append(element('h3',name+' · '+items.length+(items.length===1?' Rolle':' Rollen')));
     if (items.length) {
+      group.append(checkbox('Alle Rollen an diesem Lagerort auswählen',items));
       const byFilament = new Map();
       for (const item of items) {
         if (!byFilament.has(item.id)) byFilament.set(item.id,{...item,count:0,weighed:0,grams:0});
@@ -957,6 +1083,11 @@ function renderLocationOverview() {
           details.push(missing===1?'1 Restgewicht offen':missing+' Restgewichte offen');
         }
         line.append(link,' · '+details.join(' · '));
+        const rolls = items.filter(roll=>roll.id===item.id);
+        for (const roll of rolls) {
+          const weight = roll.weight ? ' · '+roll.weight+' g Rest' : '';
+          line.append(checkbox(item.title+' · Rolle '+(roll.index+1)+weight,[roll]));
+        }
         list.append(line);
       }
       group.append(list);
