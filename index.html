@@ -17,6 +17,7 @@ article:target > .open-roll{display:none}
 #main-menu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-bottom:1.1rem}#main-menu a{display:block;text-align:center;padding:.65rem .45rem;border:1px solid #58716e;border-radius:.6rem;font-weight:700;text-decoration:none}#main-menu a[aria-current=page]{background:var(--mint);color:#112820}.location-stock-group{background:#18242c;border:1px solid #38514f;border-radius:.8rem;padding:.75rem 1rem;margin:.7rem 0}.location-stock-group h3,.location-stock-group ul,.location-stock-group p{margin:.35rem 0}.location-stock-group li+li{margin-top:.25rem}
 .stock-detail>article>:not(.card-heading):not(.locations):not(.stock){display:none!important}.stock-cancel{margin-inline-start:.5rem}
 .stock-move-choice{display:none}.selecting-stock .stock-move-choice{display:flex;align-items:baseline;gap:.55rem;margin:.45rem 0}.stock-move-choice input{width:auto;flex:none}.stock-transfer button:disabled{opacity:.55;cursor:default}
+.local-qr img{max-width:100%;height:auto}.local-qr button{margin-inline-end:.45rem}
 </style>
 <main>
 <header><h1>Filamentlager</h1><p>Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
@@ -899,7 +900,7 @@ function updateFilterOptions() {
   for (const [select,key,all] of [[materialFilter,'material','Alle Materialien'],[colorFilter,'color','Alle Farben']]) {
     const selected = select.value;
     select.replaceChildren(new Option(all,''));
-    const options = [...new Set([...cards.children].map(card=>card.dataset[key]))].sort((a,b)=>a.localeCompare(b,'de'));
+    const options = [...new Set([...cards.children].filter(card=>!card.hasAttribute('data-shared-filament')).map(card=>card.dataset[key]))].sort((a,b)=>a.localeCompare(b,'de'));
     for (const value of options) select.add(new Option(value,value));
     if (options.includes(selected)) select.value = selected;
   }
@@ -1096,11 +1097,140 @@ function renderLocationOverview(message = '') {
   }
   if (!groups.size) locationGroups.append(element('p','Derzeit sind keine Rollen im Bestand.'));
 }
+const sharedPrefix = 'filament/';
+const publicFields = ['material','farbe',...Object.keys(labels)];
+let qrLibrary;
+function loadQrLibrary() {
+  if (!qrLibrary) qrLibrary = new Promise((resolve,reject) => {
+    const script = element('script','');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js';
+    script.integrity = 'sha384-mZT2gIty7ZDdOGkxfP6joZcYdMW1Jvj9dRlfpTmaJAKKXTqzygtB22k7FLe+KZC1';
+    script.crossOrigin = 'anonymous';
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.append(script);
+  }).catch(error=>{ qrLibrary = null; throw error; });
+  return qrLibrary;
+}
+function addLocalQr(card, roll) {
+  const data = publicFields.map(field=>roll[field] ?? '');
+  const bytes = new TextEncoder().encode(JSON.stringify(data));
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  const encoded = btoa(binary).replaceAll('+','-').replaceAll('/','_').replace(/=+$/,'');
+  const address = new URL(location.pathname,location.origin);
+  address.hash = sharedPrefix+encoded;
+  const section = element('details','');
+  section.className = 'local-qr';
+  section.append(element('summary','QR-Code und Link teilen'),element('p','Der Link enthält Material, Farbe und die technischen Daten dieser Karte. Bei späteren Änderungen kannst du einen neuen QR-Code erstellen.'));
+  const message = element('p','');
+  message.setAttribute('role','status');
+  const copy = element('button','Link kopieren');
+  copy.type = 'button';
+  const copyField = element('input','');
+  copyField.value = address.href;
+  copyField.readOnly = true;
+  copyField.hidden = true;
+  copyField.setAttribute('aria-label','Teilbarer Filamentlink');
+  copy.onclick = async () => {
+    try { await navigator.clipboard.writeText(address.href); message.textContent = 'Link kopiert.'; }
+    catch { copyField.hidden = false; copyField.focus(); copyField.select(); message.textContent = 'Du kannst den markierten Link kopieren.'; }
+  };
+  const imageArea = element('div','');
+  section.append(imageArea,copy,copyField,message);
+  card.append(section);
+  if (encoded.length>32000) {
+    copy.disabled = true;
+    imageArea.textContent = 'Die Filamentdaten sind zu lang zum Teilen. Kürze die Angaben und speichere die Karte erneut.';
+    return;
+  }
+  let generating = false;
+  section.ontoggle = async () => {
+    if (!section.open || generating) return;
+    generating = true;
+    imageArea.textContent = 'QR-Code wird erstellt …';
+    try { await loadQrLibrary(); }
+    catch { imageArea.textContent = 'QR-Code konnte nicht geladen werden. Du kannst den Link kopieren oder den Abschnitt erneut öffnen.'; generating = false; return; }
+    try {
+      const qr = qrcode(0,'M');
+      qr.addData(address.href,'Byte');
+      qr.make();
+      const count = qr.getModuleCount();
+      const canvas = element('canvas','');
+      canvas.width = canvas.height = (count+8)*8;
+      const context = canvas.getContext('2d');
+      context.fillStyle = '#fff';
+      context.fillRect(0,0,canvas.width,canvas.height);
+      context.fillStyle = '#000';
+      for (let row=0;row<count;row++) for (let column=0;column<count;column++) {
+        if (qr.isDark(row,column)) context.fillRect((column+4)*8,(row+4)*8,8,8);
+      }
+      const png = canvas.toDataURL('image/png');
+      const blob = await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+      const image = element('img','');
+      image.alt = 'QR-Code für '+roll.material+' · '+roll.farbe;
+      image.width = image.height = 240;
+      image.src = png;
+      const download = element('a','QR-Code als PNG herunterladen');
+      download.href = png;
+      download.download = 'Filament-QR.png';
+      imageArea.replaceChildren(image,download);
+      if (blob) {
+        const file = new File([blob],download.download,{type:'image/png'});
+        const share = element('button','QR-Code teilen');
+        share.type = 'button';
+        share.onclick = async () => {
+          try { await navigator.share({files:[file],title:roll.material+' · '+roll.farbe}); }
+          catch (error) { if (error.name!=='AbortError') message.textContent = 'Du kannst den QR-Code als PNG herunterladen und versenden.'; }
+        };
+        if (navigator.canShare?.({files:[file]})) imageArea.append(' ',share);
+        if (window.ClipboardItem && navigator.clipboard?.write) {
+          const copyImage = element('button','QR-Bild kopieren');
+          copyImage.type = 'button';
+          copyImage.onclick = async () => {
+            try { await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]); message.textContent = 'QR-Bild kopiert.'; }
+            catch { message.textContent = 'Du kannst das QR-Bild stattdessen herunterladen.'; }
+          };
+          imageArea.append(' ',copyImage);
+        }
+      }
+    } catch { imageArea.textContent = 'Für einen QR-Code sind die Angaben zu lang oder der Code konnte nicht erstellt werden. Der teilbare Link ist weiterhin verfügbar.'; }
+  };
+}
+function sharedCardFor(route) {
+  const existing = cards.querySelector('[data-shared-filament]');
+  if (!route.startsWith(sharedPrefix)) { existing?.remove(); return null; }
+  if (existing?.dataset.sharedFilament===route) return existing;
+  existing?.remove();
+  const card = element('article','');
+  card.dataset.sharedFilament = route;
+  try {
+    const payload = route.slice(sharedPrefix.length);
+    if (payload.length>32000 || !/^[A-Za-z0-9_-]+$/.test(payload)) throw Error();
+    const bytes = Uint8Array.from(atob(payload.replaceAll('-','+').replaceAll('_','/')),char=>char.charCodeAt(0));
+    const data = JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
+    if (!Array.isArray(data) || data.length!==publicFields.length || data.some(value=>typeof value!=='string') || !data[0].trim() || !data[1].trim()) throw Error();
+    const roll = Object.fromEntries(publicFields.map((field,index)=>[field,data[index]]));
+    const label = element('span',roll.farbe);
+    label.className = 'label';
+    card.append(label,element('h2',roll.material),element('p','Geteilte Filamentkarte · Angaben zum Zeitpunkt der Erstellung.'));
+    const specs = element('dl','');
+    for (const [field,title] of Object.entries(labels)) {
+      const item = element('div','');
+      item.append(element('dt',title),element('dd',roll[field] || 'Nicht angegeben'));
+      specs.append(item);
+    }
+    card.append(specs);
+  } catch { card.append(element('h2','Filamentlink ungültig'),element('p','Der Link ist unvollständig oder enthält ungültige Filamentdaten.')); }
+  cards.append(card);
+  return card;
+}
 let previousRoute = null;
 function filter() {
   const route = location.hash.slice(1);
   const stockPrefix = 'lagerbestand/';
-  const target = document.getElementById(route.startsWith(stockPrefix) ? route.slice(stockPrefix.length) : route);
+  const shared = sharedCardFor(route);
+  const target = shared ?? document.getElementById(route.startsWith(stockPrefix) ? route.slice(stockPrefix.length) : route);
   const single = target?.parentElement === cards;
   const stockDetail = single && route.startsWith(stockPrefix);
   cards.classList.toggle('stock-detail',stockDetail);
@@ -1154,6 +1284,7 @@ function render() {
     };
     card.append(label,element('h2',roll.material),specs,edit);
     prepareCard(card,roll.farbe);
+    addLocalQr(card,roll);
     cards.append(card);
   }
   updateFilterOptions();
