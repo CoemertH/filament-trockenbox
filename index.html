@@ -105,6 +105,13 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
 .role-panel .drying-history{margin:.75rem 0}
 .first-tools{gap:1rem}
 #backup-stock-conflicts{padding-left:1.2rem}
+.role-shortcuts{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.5rem}
+.role-action-link.action-primary{background:var(--mint);color:#10261e;border-color:var(--mint);font-weight:700}
+.role-panel .fields label[hidden]{display:none!important}
+.roll-notice{border-color:var(--mint)}
+.roll-consumed{font-size:.86rem;margin-top:.25rem}
+.location-stock-roll .role-action-link{margin:0}
+.selecting-stock .location-stock-roll .role-action-link{display:none}
 </style>
 <main>
 <nav id="page-navigation" aria-label="Seitennavigation" hidden>
@@ -112,6 +119,7 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
   <a id="all-rolls" href="#filament-bestand" hidden>← Filamentbestand</a>
 </nav>
 <header><h1 id="page-title">Hauptmenü</h1><p id="home-intro">Druck- und Trocknungsdaten deiner Rollen auf einen Blick.</p></header>
+<p id="roll-notice" class="work-panel roll-notice" role="status" hidden></p>
 <nav id="main-menu" class="workshop-dashboard" aria-label="Hauptmenü">
   <a id="menu-scan" class="dashboard-card dashboard-scan" href="#filament-scannen" aria-labelledby="label-scan" aria-describedby="detail-scan">
     <svg class="dashboard-icon" aria-hidden="true" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m13-5h3a2 2 0 0 1 2 2v3M3 16v3a2 2 0 0 0 2 2h3m13-5v3a2 2 0 0 1-2 2h-3M7 12h10m-9-4h2v2H8zm6 6h2v2h-2z"/></svg>
@@ -421,5 +429,5 @@ main{--work-surface:#17282c;--work-border:#48615f;--work-muted:#b4c8c5}
     <div><dt>Temperaturbeständigkeit der Spule</dt><dd>Unter 70 °C</dd></div>
 </template>
 <script src="./filament-stock.js"></script>
-<script src="./filament-app.js?v=13"></script>
+<script src="./filament-app.js?v=14"></script>
 </html>
